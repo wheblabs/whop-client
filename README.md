@@ -1,81 +1,50 @@
-# whop-core-auth
+# @whoplabs/whop-client
 
-Automate your Whop account with OTP authentication. Manage companies, install apps, and access the full Whop platform programmatically.
+Unofficial SDK for Whop account automation. Authenticate, create apps, manage companies programmatically.
 
 ## Installation
 
 ```bash
-bun add whop-core-auth
+bun add @whoplabs/whop-client
 ```
 
 ## Quick Start
 
 ```typescript
-import { Whop } from 'whop-core-auth'
+import { Whop } from '@whoplabs/whop-client'
 
 const whop = new Whop()
 
-// Authenticate with OTP
-const ticket = await whop.auth.sendOTP('your@email.com')
-const code = '123456' // From email
-await whop.auth.verify({ email: 'your@email.com', code, ticket })
+// First run: authenticate with OTP
+if (!whop.isAuthenticated()) {
+  const ticket = await whop.auth.sendOTP('your@email.com')
+  await whop.auth.verify({ email: 'your@email.com', code: '123456', ticket })
+}
 
-// Use authenticated client
+// Subsequent runs: session auto-loads
 const companies = await whop.companies.list()
 const apps = await whop.companies.listApps(companies[0].id)
 ```
 
-## Features
+## Core Concepts
 
-- **OTP Authentication** - Secure email-based login
-- **Session Management** - Automatic session persistence
-- **Company Management** - List and manage companies
-- **App Operations** - List, install, and retrieve app details
-- **GraphQL Support** - Direct access to Whop's GraphQL API
-- **TypeScript** - Full type safety
+**Sessions persist automatically.** First auth saves to `.whop-session.json`. Next run loads it. Add to `.gitignore`.
 
-## Documentation
+**Tokens refresh automatically.** Every request refreshes expired tokens. Never manually refresh.
 
-- [Authenticating](./docs/authenticating.md) - OTP flow and session management
-- [Listing Companies](./docs/listing-companies.md) - Retrieve user companies
-- [Listing Apps](./docs/listing-apps.md) - Get company apps with pagination
-- [App Details](./docs/app-details.md) - Detailed app information
-- [Installing Apps](./docs/installing-apps.md) - Install apps to companies
-- [Error Handling](./docs/error-handling.md) - Handle errors properly
+**Errors are typed.** Catch specific errors for better handling.
 
-## Examples
-
-### Authentication
+## Authentication
 
 ```typescript
-const whop = new Whop()
+// OTP flow
+const ticket = await whop.auth.sendOTP('email@example.com')
+await whop.auth.verify({ email, code, ticket })
 
-if (!whop.isAuthenticated()) {
-  const ticket = await whop.auth.sendOTP('user@example.com')
-  await whop.auth.verify({ email: 'user@example.com', code: '123456', ticket })
-}
-```
+// Check status
+whop.isAuthenticated() // true
 
-### List Companies
-
-```typescript
-const companies = await whop.companies.list()
-
-for (const company of companies) {
-  console.log(company.title, company.id)
-}
-```
-
-### Install App
-
-```typescript
-const experience = await whop.companies.installApp('biz_xxx', 'app_xxx')
-console.log('Installed:', experience.name)
-```
-
-### Using Existing Tokens
-
-```typescript
+// Use existing tokens (CI/CD)
 const whop = Whop.fromTokens({
   accessToken: process.env.WHOP_ACCESS_TOKEN,
   csrfToken: process.env.WHOP_CSRF_TOKEN,
@@ -83,9 +52,64 @@ const whop = Whop.fromTokens({
 })
 ```
 
-## Contributing
+## Companies
 
-Please see [CONTRIBUTING.md](./CONTRIBUTING.md) for contribution guidelines.
+```typescript
+// List owned companies
+const companies = await whop.companies.list()
+
+// List company's apps
+const apps = await whop.companies.listApps('biz_xxx')
+
+// Install app to company
+const exp = await whop.companies.installApp('biz_xxx', 'app_xxx')
+```
+
+## Apps
+
+```typescript
+// Create new app
+const app = await whop.apps.create({
+  name: 'My App',
+  companyId: 'biz_xxx',
+})
+
+// Get credentials (API keys, URLs, agent users)
+const creds = await whop.apps.getCredentials('app_xxx', 'biz_xxx')
+console.log(creds.apiKey.token)
+console.log(creds.baseDevUrl)
+console.log(creds.agentUsers[0].username)
+
+// Get public details
+const details = await whop.apps.get('app_xxx')
+```
+
+## Error Handling
+
+```typescript
+import { WhopAuthError, WhopHTTPError } from '@whoplabs/whop-client'
+
+try {
+  await whop.auth.verify({ email, code, ticket })
+} catch (error) {
+  if (error instanceof WhopAuthError) {
+    console.error('Auth failed:', error.code)
+  } else if (error instanceof WhopHTTPError) {
+    console.error('HTTP error:', error.statusCode)
+  }
+}
+```
+
+## TypeScript
+
+Full type safety included:
+
+```typescript
+import type { Company, App, AppCredentials } from '@whoplabs/whop-client'
+
+const companies: Company[] = await whop.companies.list()
+const creds: AppCredentials = await whop.apps.getCredentials('app_xxx', 'biz_xxx')
+```
 
 ## License
 
