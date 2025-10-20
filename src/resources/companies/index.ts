@@ -19,7 +19,13 @@ import type {
 	ExperiencesConnection,
 	ListExperiencesOptions,
 } from '@/types/experiences'
-import type { CreatePlanInput, Plan, UpdatePlanInput } from '@/types/plans'
+import type {
+	AccessPassPlansConnection,
+	CreatePlanInput,
+	ListAccessPassPlansOptions,
+	Plan,
+	UpdatePlanInput,
+} from '@/types/plans'
 
 /**
  * GraphQL response structure for fetchMyCompanies
@@ -883,5 +889,128 @@ export class Companies {
 		)
 
 		return response.updatePlan
+	}
+
+	/**
+	 * List plans for a specific access pass
+	 *
+	 * @param companyId - Company ID (e.g., 'biz_...')
+	 * @param accessPassId - Access pass ID (e.g., 'prod_...')
+	 * @param options - Optional pagination
+	 * @returns Paginated plans list
+	 * @throws {WhopAuthError} If not authenticated
+	 * @throws {WhopNetworkError} On network failures
+	 * @throws {WhopHTTPError} On HTTP errors or GraphQL errors
+	 *
+	 * @example
+	 * ```typescript
+	 * const whop = new Whop()
+	 *
+	 * // List plans for a specific product
+	 * const result = await whop.companies.listAccessPassPlans(
+	 *   'biz_xxx',
+	 *   'prod_xxx'
+	 * )
+	 * for (const plan of result.plans) {
+	 *   console.log(`${plan.planType} - ${plan.formattedPrice}`)
+	 *   console.log(`Active members: ${plan.activeMemberCount}`)
+	 * }
+	 * ```
+	 *
+	 * @example
+	 * ```typescript
+	 * // Paginate through plans
+	 * let cursor: string | null = null
+	 * do {
+	 *   const result = await whop.companies.listAccessPassPlans(
+	 *     'biz_xxx',
+	 *     'prod_xxx',
+	 *     { first: 50, after: cursor }
+	 *   )
+	 *   // Process result.plans...
+	 *   cursor = result.pageInfo.hasNextPage ? result.pageInfo.endCursor : null
+	 * } while (cursor)
+	 * ```
+	 */
+	async listAccessPassPlans(
+		companyId: string,
+		accessPassId: string,
+		options?: ListAccessPassPlansOptions,
+	): Promise<AccessPassPlansConnection> {
+		// Check authentication
+		const tokens = this.client.getTokens()
+		if (!tokens) {
+			throw new WhopAuthError(
+				'Not authenticated. Call auth.verify() first.',
+				'NOT_AUTHENTICATED',
+			)
+		}
+
+		// GraphQL query
+		const query = `
+      query coreFetchAccessPassPlans($companyId: ID!, $accessPassId: ID!, $after: String) {
+        company(id: $companyId) {
+          accessPass(id: $accessPassId) {
+            id
+            title
+            plans(order: active_members_count, direction: desc, first: 50, after: $after) {
+              nodes {
+                id
+                initialPrice
+                formattedPrice
+                baseCurrency
+                expirationDays
+                trialPeriodDays
+                visibility
+                internalNotes
+                releaseMethod
+                planType
+                activeMemberCount
+              }
+              pageInfo {
+                endCursor
+                startCursor
+                hasNextPage
+              }
+            }
+          }
+        }
+      }
+    `
+
+		// Build variables
+		const variables = {
+			companyId,
+			accessPassId,
+			after: options?.after ?? null,
+		}
+
+		// Make request
+		interface ListAccessPassPlansResponse {
+			company: {
+				accessPass: {
+					plans: {
+						nodes: AccessPassPlansConnection['plans']
+						pageInfo: AccessPassPlansConnection['pageInfo']
+					}
+				}
+			}
+		}
+
+		const response = await graphqlRequest<ListAccessPassPlansResponse>(
+			'coreFetchAccessPassPlans',
+			{
+				query,
+				variables,
+				operationName: 'coreFetchAccessPassPlans',
+			},
+			tokens,
+			(newTokens) => this.client._updateTokens(newTokens),
+		)
+
+		return {
+			plans: response.company.accessPass.plans.nodes,
+			pageInfo: response.company.accessPass.plans.pageInfo,
+		}
 	}
 }

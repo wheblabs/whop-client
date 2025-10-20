@@ -128,6 +128,13 @@ const updatedPlan = await whop.companies.updatePlan({
   setAsDefault: true
 })
 
+// List plans for a specific product
+const productPlans = await whop.companies.listAccessPassPlans('biz_xxx', 'prod_xxx')
+for (const plan of productPlans.plans) {
+  console.log(`${plan.planType} - ${plan.formattedPrice}`)
+  console.log(`Active members: ${plan.activeMemberCount}`)
+}
+
 // Install app to company
 const exp = await whop.companies.installApp('biz_xxx', 'app_xxx')
 ```
@@ -213,7 +220,8 @@ import type {
   UpdatedAccessPass,
   Plan,
   CreatePlanInput,
-  UpdatePlanInput
+  UpdatePlanInput,
+  AccessPassPlansConnection
 } from '@whoplabs/whop-client'
 
 const companies: Company[] = await whop.companies.list()

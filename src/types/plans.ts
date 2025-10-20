@@ -4,9 +4,22 @@
 
 export type PlanType = 'one_time' | 'renewal' | 'expiration'
 export type Visibility = 'visible' | 'hidden' | 'archived'
+export type VisibilityFilter =
+	| 'all'
+	| 'visible'
+	| 'hidden'
+	| 'archived'
+	| 'not_archived'
 export type Currency = 'USD' | 'EUR' | 'GBP' | string
 export type ReleaseMethod = 'instant' | 'waitlist' | 'nft_gated'
 export type TaxType = string
+export type PlanOrder =
+	| 'active_memberships_count'
+	| 'affiliates'
+	| 'created_at'
+	| 'expires_at'
+	| 'internal_notes'
+export type Direction = 'asc' | 'desc'
 
 export interface CustomFieldInput {
 	name: string
@@ -134,6 +147,115 @@ export interface UpdatePlanInput {
 	overrideTaxType?: TaxType
 	/** Short link */
 	shortLink?: string
+}
+
+export interface CustomField {
+	id: string
+	fieldType: string
+	name: string
+	required: boolean
+	placeholder: string | null
+}
+
+export interface PlanFilters {
+	/** Filter by specific product */
+	accessPassId?: string
+	/** Has affiliates */
+	affiliates?: boolean
+	/** Has passholder affiliates */
+	passholderAffiliate?: boolean
+	/** Visibility filter */
+	visibility?: VisibilityFilter
+	/** Release method filter */
+	releaseMethod?: ReleaseMethod
+	/** Text search */
+	query?: string
+	/** What to sort by */
+	order?: PlanOrder
+	/** Sort direction */
+	direction?: Direction
+}
+
+export interface ListPlansOptions {
+	/** Filter options */
+	filter?: PlanFilters
+	/** Number of plans to fetch */
+	first?: number
+}
+
+export interface ListAccessPassPlansOptions {
+	/** Number of plans to fetch */
+	first?: number
+	/** Cursor for pagination */
+	after?: string
+}
+
+export interface DetailedPlan {
+	id: string
+	name: string
+	visibility: string
+	createdAt: string
+	directLink: string
+	planType: string
+	formattedPrice: string
+	formattedInitialPrice: string | null
+	activeMemberCount: number
+	stock: number | null
+	unlimitedStock: boolean
+	deletable: boolean
+	shortLink: string | null
+	redirectUrl: string | null
+	initialPrice: string | null
+	totalSales: number
+	releaseMethod: string
+	accessPass: {
+		id: string
+		title: string
+	}
+	title: string
+	baseCurrency: string
+	billingPeriod: number | null
+	trialPeriodDays: number | null
+	renewalPrice: string | null
+	expirationDays: number | null
+	cancelDiscountIntervals: number | null
+	cancelDiscountPercentage: number | null
+	internalNotes: string | null
+	description: string | null
+	customFields: CustomField[]
+	cardPayments: boolean
+	paypalAccepted: boolean
+	coinbaseCommerceAccepted: boolean
+	platformBalanceAccepted: boolean
+	splititAccepted: boolean
+	achPayments: boolean
+}
+
+export interface AccessPassPlan {
+	id: string
+	initialPrice: string | null
+	formattedPrice: string
+	baseCurrency: string
+	expirationDays: number | null
+	trialPeriodDays: number | null
+	visibility: string
+	internalNotes: string | null
+	releaseMethod: string
+	planType: string
+	activeMemberCount: number
+}
+
+export interface PlansConnection {
+	plans: DetailedPlan[]
+}
+
+export interface AccessPassPlansConnection {
+	plans: AccessPassPlan[]
+	pageInfo: {
+		endCursor: string | null
+		startCursor: string | null
+		hasNextPage: boolean
+	}
 }
 
 export interface Plan {
