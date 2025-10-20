@@ -432,7 +432,7 @@ export class Companies {
 	 * List access passes for a company
 	 *
 	 * @param companyId - Company ID (e.g., 'biz_...')
-	 * @param options - Optional pagination options
+	 * @param options - Optional filters and pagination
 	 * @returns Paginated access passes list
 	 * @throws {WhopAuthError} If not authenticated
 	 * @throws {WhopNetworkError} On network failures
@@ -446,23 +446,29 @@ export class Companies {
 	 * const result = await whop.companies.listAccessPasses('biz_xxx')
 	 * console.log(`Total: ${result.totalCount}`)
 	 * for (const pass of result.accessPasses) {
-	 *   console.log(`${pass.title} - ${pass.activeMembersCount} members`)
-	 *   console.log(`Price: ${pass.defaultPlan?.formattedPrice || 'N/A'}`)
+	 *   console.log(`${pass.title} (${pass.accessPassType})`)
+	 *   console.log(`Members: ${pass.activeMembersCount}`)
+	 *   if (pass.defaultPlan) {
+	 *     console.log(`Price: ${pass.defaultPlan.formattedPrice}`)
+	 *     console.log(`Checkout: ${pass.defaultPlan.directLink}`)
+	 *   }
 	 * }
 	 * ```
 	 *
 	 * @example
 	 * ```typescript
-	 * // Paginate through access passes
-	 * let cursor: string | null = null
-	 * do {
-	 *   const result = await whop.companies.listAccessPasses('biz_xxx', {
-	 *     first: 50,
-	 *     after: cursor
-	 *   })
-	 *   // Process result.accessPasses...
-	 *   cursor = result.pageInfo.hasNextPage ? result.pageInfo.endCursor : null
-	 * } while (cursor)
+	 * // List only app-based products
+	 * const apps = await whop.companies.listAccessPasses('biz_xxx', {
+	 *   accessPassTypes: ['app']
+	 * })
+	 * ```
+	 *
+	 * @example
+	 * ```typescript
+	 * // List regular products (store pages)
+	 * const regular = await whop.companies.listAccessPasses('biz_xxx', {
+	 *   accessPassTypes: ['regular']
+	 * })
 	 * ```
 	 */
 	async listAccessPasses(
@@ -480,15 +486,30 @@ export class Companies {
 
 		// GraphQL query
 		const query = `
-      query coreFetchCompanyAccessPassesV2($companyId: ID!, $first: Int, $after: String, $before: String) {
+      query coreFetchCompanyAccessPassesV2(
+        $companyId: ID!, 
+        $first: Int, 
+        $after: String, 
+        $before: String,
+        $accessPassTypes: [AccessPassTypes!]
+      ) {
         company(id: $companyId) {
-          accessPassesV2(first: $first, after: $after, before: $before, order: active_memberships_count) {
+          accessPassesV2(
+            first: $first, 
+            after: $after, 
+            before: $before, 
+            order: active_memberships_count,
+            accessPassTypes: $accessPassTypes
+          ) {
             nodes {
               id
               title
+              accessPassType
               activeMembersCount
               defaultPlan {
+                id
                 formattedPrice
+                directLink
               }
             }
             totalCount
@@ -509,6 +530,7 @@ export class Companies {
 			first: options?.first ?? 100,
 			after: options?.after ?? null,
 			before: options?.before ?? null,
+			accessPassTypes: options?.accessPassTypes ?? null,
 		}
 
 		// Make request

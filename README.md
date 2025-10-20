@@ -80,9 +80,18 @@ const filtered = await whop.companies.listExperiences('biz_xxx', {
 const passes = await whop.companies.listAccessPasses('biz_xxx')
 console.log(`Total products: ${passes.totalCount}`)
 for (const pass of passes.accessPasses) {
-  console.log(`${pass.title} - ${pass.activeMembersCount} members`)
-  console.log(`Price: ${pass.defaultPlan?.formattedPrice || 'N/A'}`)
+  console.log(`${pass.title} (${pass.accessPassType})`)
+  console.log(`Members: ${pass.activeMembersCount}`)
+  if (pass.defaultPlan) {
+    console.log(`Price: ${pass.defaultPlan.formattedPrice}`)
+    console.log(`Checkout: ${pass.defaultPlan.directLink}`)
+  }
 }
+
+// Filter by access pass type
+const appProducts = await whop.companies.listAccessPasses('biz_xxx', {
+  accessPassTypes: ['app']  // Only app-based products
+})
 
 // Create a new access pass (product) with auto-generated plan
 const newPass = await whop.companies.createAccessPass({

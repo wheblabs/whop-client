@@ -210,9 +210,12 @@ export interface CreatedAccessPass {
 export interface AccessPass {
 	id: string
 	title: string
+	accessPassType: AccessPassType
 	activeMembersCount: number
 	defaultPlan: {
+		id: string
 		formattedPrice: string
+		directLink: string
 	} | null
 }
 
@@ -234,6 +237,8 @@ export interface AccessPassesConnection {
  * Options for listing access passes
  */
 export interface ListAccessPassesOptions {
+	/** Filter by access pass types */
+	accessPassTypes?: AccessPassType[]
 	/** Number of items to fetch from start */
 	first?: number
 	/** Cursor for forward pagination */
