@@ -76,6 +76,58 @@ const filtered = await whop.companies.listExperiences('biz_xxx', {
   appId: 'app_xxx'
 })
 
+// List company's access passes (products)
+const passes = await whop.companies.listAccessPasses('biz_xxx')
+console.log(`Total products: ${passes.totalCount}`)
+for (const pass of passes.accessPasses) {
+  console.log(`${pass.title} - ${pass.activeMembersCount} members`)
+  console.log(`Price: ${pass.defaultPlan?.formattedPrice || 'N/A'}`)
+}
+
+// Create a new access pass (product)
+const newPass = await whop.companies.createAccessPass({
+  title: 'My Premium Community',
+  companyId: 'biz_xxx',
+  headline: 'Exclusive access',
+  description: 'Join our community',
+  visibility: 'visible',
+  planOptions: {
+    baseCurrency: 'USD',
+    renewalPrice: 29.99,
+    planType: 'renewal',
+    billingPeriod: 30
+  }
+})
+console.log(`Created: ${newPass.title} at /${newPass.route}`)
+
+// Update an existing access pass
+const updatedPass = await whop.companies.updateAccessPass({
+  id: 'prod_xxx',
+  title: 'New Product Name',
+  visibility: 'visible',
+  showMemberCount: true
+})
+
+// Create a plan for an access pass
+const plan = await whop.companies.createPlan({
+  productId: 'prod_xxx',
+  title: 'Monthly Membership',
+  planType: 'renewal',
+  visibility: 'visible',
+  currency: 'usd',
+  renewalPrice: '29.99',
+  billingPeriod: 30,
+  trialPeriodDays: 7
+})
+console.log(`Checkout link: ${plan.directLink}`)
+
+// Update a plan
+const updatedPlan = await whop.companies.updatePlan({
+  id: 'plan_xxx',
+  renewalPrice: '39.99',
+  setAsDefault: true
+})
+
 // Install app to company
 const exp = await whop.companies.installApp('biz_xxx', 'app_xxx')
 ```
@@ -152,13 +204,23 @@ import type {
   CurrentUser,
   UpdateAppInput,
   Experience,
-  ExperiencesConnection
+  ExperiencesConnection,
+  AccessPass,
+  AccessPassesConnection,
+  CreateAccessPassInput,
+  CreatedAccessPass,
+  UpdateAccessPassInput,
+  UpdatedAccessPass,
+  Plan,
+  CreatePlanInput,
+  UpdatePlanInput
 } from '@whoplabs/whop-client'
 
 const companies: Company[] = await whop.companies.list()
 const creds: AppCredentials = await whop.apps.getCredentials('app_xxx', 'biz_xxx')
 const user: CurrentUser = await whop.me.get()
 const experiences: ExperiencesConnection = await whop.companies.listExperiences('biz_xxx')
+const passes: AccessPassesConnection = await whop.companies.listAccessPasses('biz_xxx')
 ```
 
 ## License
