@@ -22,6 +22,9 @@ if (!whop.isAuthenticated()) {
 }
 
 // Subsequent runs: session auto-loads
+const user = await whop.me.get()
+console.log(`Logged in as ${user.username}`)
+
 const companies = await whop.companies.list()
 const apps = await whop.companies.listApps(companies[0].id)
 ```
@@ -65,6 +68,18 @@ const apps = await whop.companies.listApps('biz_xxx')
 const exp = await whop.companies.installApp('biz_xxx', 'app_xxx')
 ```
 
+## Current User
+
+```typescript
+// Get authenticated user info
+const user = await whop.me.get()
+
+console.log(user.username)      // 'c0nstantine'
+console.log(user.email)         // 'your@email.com'
+console.log(user.id)            // 'user_xxx'
+console.log(user.profilePic48.original) // Profile picture URL
+```
+
 ## Apps
 
 ```typescript
@@ -74,14 +89,23 @@ const app = await whop.apps.create({
   companyId: 'biz_xxx',
 })
 
+// Get public details
+const details = await whop.apps.get('app_xxx')
+
+// Update app
+const updated = await whop.apps.update('app_xxx', {
+  name: 'New Name',
+  description: 'Updated description',
+  status: 'live', // 'live' | 'unlisted' | 'hidden'
+  baseUrl: 'https://myapp.com',
+  baseDevUrl: 'http://localhost:3000',
+})
+
 // Get credentials (API keys, URLs, agent users)
 const creds = await whop.apps.getCredentials('app_xxx', 'biz_xxx')
 console.log(creds.apiKey.token)
 console.log(creds.baseDevUrl)
 console.log(creds.agentUsers[0].username)
-
-// Get public details
-const details = await whop.apps.get('app_xxx')
 ```
 
 ## Error Handling
@@ -105,10 +129,17 @@ try {
 Full type safety included:
 
 ```typescript
-import type { Company, App, AppCredentials } from '@whoplabs/whop-client'
+import type { 
+  Company, 
+  App, 
+  AppCredentials,
+  CurrentUser,
+  UpdateAppInput 
+} from '@whoplabs/whop-client'
 
 const companies: Company[] = await whop.companies.list()
 const creds: AppCredentials = await whop.apps.getCredentials('app_xxx', 'biz_xxx')
+const user: CurrentUser = await whop.me.get()
 ```
 
 ## License
