@@ -569,12 +569,19 @@ export class Companies {
 	 *   visibility: 'visible',
 	 *   businessType: 'community',
 	 *   planOptions: {
-	 *     baseCurrency: 'USD',
+	 *     baseCurrency: 'usd',
 	 *     renewalPrice: 29.99,
 	 *     planType: 'renewal',
 	 *     billingPeriod: 30
 	 *   }
 	 * })
+	 *
+	 * // Get the auto-created plan details
+	 * if (pass.defaultPlan) {
+	 *   console.log(`Plan ID: ${pass.defaultPlan.id}`)
+	 *   console.log(`Checkout link: ${pass.defaultPlan.directLink}`)
+	 *   console.log(`Price: ${pass.defaultPlan.formattedPrice}`)
+	 * }
 	 * ```
 	 */
 	async createAccessPass(
@@ -610,7 +617,13 @@ export class Companies {
           createdAt
           activeMembersCount
           defaultPlan {
+            id
+            directLink
             formattedPrice
+            planType
+            visibility
+            renewalPrice
+            initialPrice
           }
         }
       }

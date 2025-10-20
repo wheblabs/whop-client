@@ -84,7 +84,7 @@ for (const pass of passes.accessPasses) {
   console.log(`Price: ${pass.defaultPlan?.formattedPrice || 'N/A'}`)
 }
 
-// Create a new access pass (product)
+// Create a new access pass (product) with auto-generated plan
 const newPass = await whop.companies.createAccessPass({
   title: 'My Premium Community',
   companyId: 'biz_xxx',
@@ -92,13 +92,17 @@ const newPass = await whop.companies.createAccessPass({
   description: 'Join our community',
   visibility: 'visible',
   planOptions: {
-    baseCurrency: 'USD',
+    baseCurrency: 'usd',
     renewalPrice: 29.99,
     planType: 'renewal',
     billingPeriod: 30
   }
 })
 console.log(`Created: ${newPass.title} at /${newPass.route}`)
+if (newPass.defaultPlan) {
+  console.log(`Checkout link: ${newPass.defaultPlan.directLink}`)
+  console.log(`Plan ID: ${newPass.defaultPlan.id}`)
+}
 
 // Update an existing access pass
 const updatedPass = await whop.companies.updateAccessPass({

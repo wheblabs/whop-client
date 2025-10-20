@@ -197,7 +197,13 @@ export interface CreatedAccessPass {
 	createdAt: string
 	activeMembersCount: number
 	defaultPlan: {
+		id: string
+		directLink: string
 		formattedPrice: string
+		planType: string
+		visibility: string
+		renewalPrice: string | null
+		initialPrice: string | null
 	} | null
 }
 
