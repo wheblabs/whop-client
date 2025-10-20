@@ -463,4 +463,55 @@ export class Apps {
 
 		return response.updateAppV2
 	}
+
+	/**
+	 * Get the URL to access an app in the Whop dashboard
+	 *
+	 * @param appId - App ID (e.g., 'app_...')
+	 * @param companyId - Company ID (e.g., 'biz_...')
+	 * @returns URL to open the app in Whop dashboard
+	 * @throws {WhopAuthError} If not authenticated
+	 * @throws {Error} If no experience found for the app
+	 *
+	 * @example
+	 * ```typescript
+	 * const whop = new Whop()
+	 *
+	 * const url = await whop.apps.getUrl('app_xxx', 'biz_xxx')
+	 * console.log(url) // https://whop.com/biz_xxx/app-name-123/app
+	 * ```
+	 */
+	async getUrl(appId: string, companyId: string): Promise<string> {
+		// Check authentication
+		const tokens = this.client.getTokens()
+		if (!tokens) {
+			throw new WhopAuthError(
+				'Not authenticated. Call auth.verify() first.',
+				'NOT_AUTHENTICATED',
+			)
+		}
+
+		// Get experiences for this app
+		const { experiences } = await this.client.companies.listExperiences(
+			companyId,
+			{
+				appId,
+				first: 1,
+			},
+		)
+
+		const experience = experiences[0]
+		if (!experience) {
+			throw new Error(
+				`No experience found for app ${appId} in company ${companyId}`,
+			)
+		}
+
+		const experienceId = experience.id.replace('exp_', '')
+		const transformedAppName = experience.app.name
+			.replace(/\s+/g, '-')
+			.toLowerCase()
+
+		return `https://whop.com/${companyId}/${transformedAppName}-${experienceId}/app`
+	}
 }

@@ -64,6 +64,18 @@ const companies = await whop.companies.list()
 // List company's apps
 const apps = await whop.companies.listApps('biz_xxx')
 
+// List company's experiences
+const result = await whop.companies.listExperiences('biz_xxx')
+console.log(`Total: ${result.totalCount}`)
+for (const exp of result.experiences) {
+  console.log(`${exp.name} - ${exp.app.name}`)
+}
+
+// Filter experiences by app
+const filtered = await whop.companies.listExperiences('biz_xxx', {
+  appId: 'app_xxx'
+})
+
 // Install app to company
 const exp = await whop.companies.installApp('biz_xxx', 'app_xxx')
 ```
@@ -106,6 +118,10 @@ const creds = await whop.apps.getCredentials('app_xxx', 'biz_xxx')
 console.log(creds.apiKey.token)
 console.log(creds.baseDevUrl)
 console.log(creds.agentUsers[0].username)
+
+// Get app URL for dashboard access
+const url = await whop.apps.getUrl('app_xxx', 'biz_xxx')
+console.log(url) // https://whop.com/biz_xxx/app-name-123/app
 ```
 
 ## Error Handling
@@ -134,12 +150,15 @@ import type {
   App, 
   AppCredentials,
   CurrentUser,
-  UpdateAppInput 
+  UpdateAppInput,
+  Experience,
+  ExperiencesConnection
 } from '@whoplabs/whop-client'
 
 const companies: Company[] = await whop.companies.list()
 const creds: AppCredentials = await whop.apps.getCredentials('app_xxx', 'biz_xxx')
 const user: CurrentUser = await whop.me.get()
+const experiences: ExperiencesConnection = await whop.companies.listExperiences('biz_xxx')
 ```
 
 ## License
