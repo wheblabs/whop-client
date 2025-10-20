@@ -120,3 +120,64 @@ export interface InstallAppOptions {
 		}>
 	}
 }
+
+/**
+ * Input for updating an app
+ */
+export interface UpdateAppInput {
+	/** App description */
+	description?: string
+	/** Description for app store in-depth view */
+	appStoreDescription?: string
+	/** Base production URL */
+	baseUrl?: string
+	/** Base developer URL */
+	baseDevUrl?: string
+	/** Base preview URL */
+	basePreviewUrl?: string
+	/** Path for dashboard view */
+	dashboardPath?: string
+	/** Path for discover view */
+	discoverPath?: string
+	/** Path for hub view */
+	experiencePath?: string
+	/** Hub call-to-action text */
+	hubCta?: string
+	/** App name */
+	name?: string
+	/** Product page text */
+	productPage?: string
+	/** OAuth scopes array */
+	requiredScopes?: string[]
+	/** App status (live/unlisted/hidden) */
+	status?: 'live' | 'unlisted' | 'hidden'
+}
+
+/**
+ * Updated app details (full response from updateAppV2)
+ */
+export interface UpdatedApp {
+	id: string
+	name: string
+	description: string | null
+	domainId: string
+	appStoreDescription: string | null
+	baseUrl: string | null
+	baseDevUrl: string | null
+	basePreviewUrl: string | null
+	experiencePath: string | null
+	consumerViewUrlTemplate: string | null
+	dashboardViewUrlTemplate: string | null
+	discoverViewUrlTemplate: string | null
+	status: 'live' | 'unlisted' | 'hidden'
+	verified: boolean
+	requiredScopes: string[]
+	totalInstallsLast30Days: number
+	count: number | null
+	usingDefaultIcon: boolean
+	icon: AppIcon | null
+	company: {
+		id: string
+		title: string
+	}
+}

@@ -2,7 +2,12 @@ import type { Whop } from '@/client'
 import { WhopAuthError } from '@/lib/errors'
 import { graphqlRequest } from '@/lib/graphql'
 import type { AppCredentials } from '@/types/app-credentials'
-import type { AppDetails, Attachment } from '@/types/apps'
+import type {
+	AppDetails,
+	Attachment,
+	UpdateAppInput,
+	UpdatedApp,
+} from '@/types/apps'
 import type { CreateAppInput, CreatedApp } from '@/types/create-app'
 
 /**
@@ -355,5 +360,107 @@ export class Apps {
 			apiKeys: response.createApp.apiKeys.nodes,
 			agentUsers: response.createApp.agentUsers.nodes,
 		}
+	}
+
+	/**
+	 * Update an existing app
+	 *
+	 * @param appId - App ID to update (e.g., 'app_...')
+	 * @param input - Fields to update (all optional)
+	 * @returns Updated app details
+	 * @throws {WhopAuthError} If not authenticated
+	 * @throws {WhopNetworkError} On network failures
+	 * @throws {WhopHTTPError} On HTTP errors or GraphQL errors
+	 *
+	 * @example
+	 * ```typescript
+	 * const whop = new Whop()
+	 *
+	 * // Update app name and status
+	 * const app = await whop.apps.update('app_abc123', {
+	 *   name: 'New App Name',
+	 *   status: 'live'
+	 * })
+	 *
+	 * console.log('Updated:', app.name)
+	 * console.log('Status:', app.status)
+	 * ```
+	 *
+	 * @example
+	 * ```typescript
+	 * // Update URLs and description
+	 * const app = await whop.apps.update('app_abc123', {
+	 *   description: 'An awesome new app',
+	 *   baseUrl: 'https://myapp.com',
+	 *   baseDevUrl: 'http://localhost:3000'
+	 * })
+	 * ```
+	 */
+	async update(appId: string, input: UpdateAppInput): Promise<UpdatedApp> {
+		// Check authentication
+		const tokens = this.client.getTokens()
+		if (!tokens) {
+			throw new WhopAuthError(
+				'Not authenticated. Call auth.verify() first.',
+				'NOT_AUTHENTICATED',
+			)
+		}
+
+		// GraphQL mutation
+		const mutation = `
+      mutation updateAppV2($input: UpdateAppInput!) {
+        updateAppV2(input: $input) {
+          id
+          name
+          description
+          domainId
+          appStoreDescription
+          baseUrl
+          baseDevUrl
+          basePreviewUrl
+          experiencePath
+          consumerViewUrlTemplate
+          dashboardViewUrlTemplate
+          discoverViewUrlTemplate
+          status
+          verified
+          requiredScopes
+          totalInstallsLast30Days
+          count
+          usingDefaultIcon
+          icon {
+            source(variant: s180) {
+              url
+            }
+          }
+          company {
+            id
+            title
+          }
+        }
+      }
+    `
+
+		// Merge appId with input
+		const variables = {
+			input: {
+				id: appId,
+				...input,
+			},
+		}
+
+		// Make request
+		interface UpdateAppV2Response {
+			updateAppV2: UpdatedApp
+		}
+
+		const response = await graphqlRequest<UpdateAppV2Response>(
+			'updateAppV2',
+			{ query: mutation, variables, operationName: 'updateAppV2' },
+			tokens,
+			(newTokens) => this.client._updateTokens(newTokens),
+		)
+
+		return response.updateAppV2
 	}
 }

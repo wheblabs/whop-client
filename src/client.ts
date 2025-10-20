@@ -8,6 +8,7 @@ import { loadSessionSync, saveSession } from '@/lib/session'
 import { Apps } from '@/resources/apps'
 import { Auth } from '@/resources/auth'
 import { Companies } from '@/resources/companies'
+import { Me } from '@/resources/me'
 import type { AuthTokens, ServerAction, WhopOptions } from '@/types'
 
 /**
@@ -88,6 +89,7 @@ export class Whop {
 	public readonly auth: Auth
 	public readonly apps: Apps
 	public readonly companies: Companies
+	public readonly me: Me
 
 	private _tokens: AuthTokens | undefined = undefined
 	private _serverActions: ServerAction[] | undefined = undefined
@@ -145,6 +147,7 @@ export class Whop {
 		this.auth = new Auth(this)
 		this.apps = new Apps(this)
 		this.companies = new Companies(this)
+		this.me = new Me(this)
 
 		if (options.autoLoad) {
 			// Load session synchronously from file
