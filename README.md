@@ -171,6 +171,7 @@ console.log(user.profilePic48.original) // Profile picture URL
 const app = await whop.apps.create({
   name: 'My App',
   companyId: 'biz_xxx',
+  baseUrl: 'https://myapp.com'  // Optional
 })
 
 // Get public details

@@ -275,7 +275,7 @@ export class Apps {
 	/**
 	 * Create a new app for a company
 	 *
-	 * @param input - App creation parameters (name, companyId, description)
+	 * @param input - App creation parameters (name, companyId, optional baseUrl)
 	 * @returns Created app with API keys, agent users, and access pass
 	 * @throws {WhopAuthError} If not authenticated
 	 * @throws {WhopNetworkError} On network failures
@@ -293,6 +293,17 @@ export class Apps {
 	 * console.log('Created:', app.name)
 	 * console.log('API Key:', app.apiKeys[0].token)
 	 * console.log('Agent:', app.agentUsers[0].username)
+	 * ```
+	 *
+	 * @example
+	 * ```typescript
+	 * // Create app with base URL
+	 * const app = await whop.apps.create({
+	 *   name: 'My App',
+	 *   companyId: 'biz_xxx',
+	 *   baseUrl: 'https://myapp.com'
+	 * })
+	 * console.log('Base URL:', app.baseUrl)
 	 * ```
 	 */
 	async create(input: CreateAppInput): Promise<CreatedApp> {

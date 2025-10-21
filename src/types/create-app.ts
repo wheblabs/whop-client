@@ -9,6 +9,8 @@ export interface CreateAppInput {
 	name: string
 	/** Company ID to create the app under */
 	companyId: string
+	/** Base URL for production (optional) */
+	baseUrl?: string
 }
 
 export interface CreatedApp {
