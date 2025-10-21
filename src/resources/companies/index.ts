@@ -671,7 +671,39 @@ export class Companies {
 			(newTokens) => this.client._updateTokens(newTokens),
 		)
 
-		return response.createAccessPass
+		const createdPass = response.createAccessPass
+
+		// If planOptions was provided but defaultPlan is null, fetch the created plan
+		if (input.planOptions && !createdPass.defaultPlan) {
+			try {
+				const plans = await this.listAccessPassPlans(
+					input.companyId,
+					createdPass.id,
+					{ first: 1 },
+				)
+
+				const plan = plans.plans[0]
+				if (plan) {
+					// Populate defaultPlan with the created plan
+					return {
+						...createdPass,
+						defaultPlan: {
+							id: plan.id,
+							directLink: `https://whop.com/checkout/${plan.id}?d2c=true`,
+							formattedPrice: plan.formattedPrice,
+							planType: plan.planType,
+							visibility: plan.visibility,
+							renewalPrice: plan.initialPrice, // For one_time, this is in initialPrice
+							initialPrice: plan.initialPrice,
+						},
+					}
+				}
+			} catch {
+				// If fetching fails, just return the original response
+			}
+		}
+
+		return createdPass
 	}
 
 	/**
