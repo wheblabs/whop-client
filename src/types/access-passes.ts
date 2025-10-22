@@ -2,7 +2,25 @@
  * Access Pass types
  */
 
-export type Visibility = 'visible' | 'hidden' | 'archived'
+import type {
+	AttachmentInput,
+	Currency,
+	CustomFieldInput,
+	PlanType,
+	ReleaseMethod,
+	Visibility,
+} from './shared'
+
+// Re-export shared types for backward compatibility
+export type {
+	AttachmentInput,
+	Currency,
+	CustomFieldInput,
+	PlanType,
+	ReleaseMethod,
+	Visibility,
+}
+
 export type AccessPassType =
 	| 'regular'
 	| 'app'
@@ -17,24 +35,10 @@ export type BusinessType =
 export type IndustryType = string
 export type CustomCta = string
 export type GlobalAffiliateStatus = string
-export type Currency = 'USD' | 'EUR' | 'GBP' | string
-export type PlanType = 'one_time' | 'renewal' | 'expiration'
-export type ReleaseMethod = 'instant' | 'waitlist' | 'nft_gated'
-
-export interface AttachmentInput {
-	directUploadId?: string
-	id?: string
-}
 
 export interface AccessPassProductHighlightInput {
 	title: string
 	description?: string
-}
-
-export interface CustomFieldInput {
-	name: string
-	required?: boolean
-	type?: string
 }
 
 export interface CompanyOnboardingPlanOptions {

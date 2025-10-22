@@ -2,16 +2,31 @@
  * Plan types
  */
 
-export type PlanType = 'one_time' | 'renewal' | 'expiration'
-export type Visibility = 'visible' | 'hidden' | 'archived'
+import type {
+	AttachmentInput,
+	Currency,
+	CustomFieldInput,
+	PlanType,
+	ReleaseMethod,
+	Visibility,
+} from './shared'
+
+// Re-export shared types for backward compatibility
+export type {
+	AttachmentInput,
+	Currency,
+	CustomFieldInput,
+	PlanType,
+	ReleaseMethod,
+	Visibility,
+}
+
 export type VisibilityFilter =
 	| 'all'
 	| 'visible'
 	| 'hidden'
 	| 'archived'
 	| 'not_archived'
-export type Currency = 'USD' | 'EUR' | 'GBP' | string
-export type ReleaseMethod = 'instant' | 'waitlist' | 'nft_gated'
 export type TaxType = string
 export type PlanOrder =
 	| 'active_memberships_count'
@@ -21,20 +36,9 @@ export type PlanOrder =
 	| 'internal_notes'
 export type Direction = 'asc' | 'desc'
 
-export interface CustomFieldInput {
-	name: string
-	required?: boolean
-	type?: string
-}
-
 export interface AffiliateSettingsInput {
 	status?: string
 	percentage?: number
-}
-
-export interface AttachmentInput {
-	directUploadId?: string
-	id?: string
 }
 
 export interface CreatePlanInput {

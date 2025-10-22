@@ -18,14 +18,14 @@ export type {
 	RequestedPermission,
 } from '@/types/app-credentials'
 export type {
-	AccessPass,
+	AppAccessPass,
 	AppDetailStats,
 	AppDetails,
 	AppIcon,
+	AppInstallExperience,
 	Attachment,
 	AttachmentsConnection,
 	Creator,
-	Experience,
 	ExperienceAccessPass,
 	InstallAppOptions,
 	MarketplaceCategory,

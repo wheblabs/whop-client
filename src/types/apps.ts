@@ -12,7 +12,7 @@ export interface AppDetails {
 	verified: boolean
 	icon: AppIcon | null
 	stats: AppDetailStats
-	accessPass: AccessPass | null
+	accessPass: AppAccessPass | null
 	creator: Creator
 }
 
@@ -26,7 +26,7 @@ export interface AppDetailStats {
 	mau: number
 }
 
-export interface AccessPass {
+export interface AppAccessPass {
 	id: string
 	route: string
 	title: string
@@ -74,7 +74,7 @@ export interface ProfilePicture {
  * Experience (app installation) types
  */
 
-export interface Experience {
+export interface AppInstallExperience {
 	id: string
 	name: string
 	company: {

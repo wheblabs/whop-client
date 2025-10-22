@@ -10,7 +10,7 @@ import type {
 	UpdatedAccessPass,
 } from '@/types/access-passes'
 import type {
-	Experience,
+	AppInstallExperience,
 	ExperienceAccessPass,
 	InstallAppOptions,
 } from '@/types/apps'
@@ -225,7 +225,7 @@ export class Companies {
 		companyId: string,
 		appId: string,
 		options?: InstallAppOptions,
-	): Promise<Experience> {
+	): Promise<AppInstallExperience> {
 		// Check authentication
 		const tokens = this.client.getTokens()
 		if (!tokens) {
@@ -269,7 +269,7 @@ export class Companies {
 		// Make request
 		interface InstallAppResponse {
 			installApp: {
-				createdExperience: Omit<Experience, 'accessPasses'> & {
+				createdExperience: Omit<AppInstallExperience, 'accessPasses'> & {
 					accessPasses: { nodes: ExperienceAccessPass[] }
 				}
 			}
