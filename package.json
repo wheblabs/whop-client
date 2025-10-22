@@ -1,6 +1,6 @@
 {
   "name": "@whoplabs/whop-client",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Whop account SDK",
   "homepage": "https://github.com/wheblabs/whop-client#readme",
   "bugs": {
@@ -17,7 +17,7 @@
   "scripts": {
     "build": "bunup",
     "dev": "bunup --watch",
-    "postinstall": "bun simple-git-hooks",
+    "prepare": "bun simple-git-hooks",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "release": "bumpp --commit --push --tag",
