@@ -49,117 +49,134 @@ export async function extractServerActions(
 		)
 	}
 
-	// 3. Extract JS paths
-	const jsPaths = new Set<string>()
-	for (const [_, pushCall] of scriptMatches) {
-		const paths = pushCall?.match(/"(static\/chunks\/[^"]+\.js[^"]*)"/g)
-		if (paths) {
-			for (const path of paths) {
-				jsPaths.add(decodeURIComponent(path.slice(1, -1)))
+	// 3. Extract script URLs from HTML
+	const baseUrl = new URL(pageUrl)
+	const scriptSrcRegex = /<script[^>]+src=["']([^"']+\.js[^"']*)["']/gi
+	const scriptUrls: string[] = []
+	let match: RegExpExecArray | null
+
+	while (true) {
+		match = scriptSrcRegex.exec(html)
+		if (match === null) break
+
+		const scriptPath = match[1]
+		if (!scriptPath) continue
+
+		// Replace \u002F with / (URL-encoded forward slashes)
+		const normalizedPath = scriptPath.replace(/\\u002F/g, '/')
+
+		try {
+			let url: URL
+
+			// Check if it's already a full URL
+			if (
+				normalizedPath.startsWith('http://') ||
+				normalizedPath.startsWith('https://')
+			) {
+				url = new URL(normalizedPath)
+			} else if (normalizedPath.startsWith('/')) {
+				// Absolute path on same domain
+				url = new URL(normalizedPath, baseUrl.origin)
+			} else {
+				// Relative path
+				url = new URL(normalizedPath, baseUrl.origin)
 			}
-		}
+
+			scriptUrls.push(url.toString())
+		} catch {}
 	}
 
-	// 4. Find login page chunk
-	const pageChunk = Array.from(jsPaths).find((p) => p.includes('/login/page-'))
-
-	if (!pageChunk) {
+	if (scriptUrls.length === 0) {
 		throw new WhopParseError(
-			'Login page chunk not found in extracted JS paths',
-			'login_chunk',
-			`Expected to find a chunk matching '/login/page-*'. Found ${jsPaths.size} total chunks.`,
+			'No script URLs found in login page',
+			'script_urls',
+			'Expected to find script tags with src attributes',
 		)
 	}
 
-	// 5. Fetch page chunk
-	let pageJs: string
-	try {
-		const resp = await fetch(`https://whop.com/_next/${pageChunk}`)
-		if (!resp.ok) {
-			throw new WhopHTTPError(
-				`Failed to fetch login page chunk: HTTP ${resp.status}`,
-				`https://whop.com/_next/${pageChunk}`,
-				resp.status,
-			)
-		}
-		pageJs = await resp.text()
-	} catch (error) {
-		if (error instanceof WhopError) throw error
-
-		throw new WhopNetworkError(
-			'Network error while fetching login page chunk',
-			`https://whop.com/_next/${pageChunk}`,
-			undefined,
-			error as Error,
-		)
-	}
-
-	// 6. Extract bundle IDs
-	const bundleIds = [...pageJs.matchAll(/s\.bind\(s,(\d+)\)|s\((\d+)\)/g)]
-		.map((m) => m[1] || m[2])
-		.filter((item) => item !== undefined)
-
-	if (bundleIds.length === 0) {
-		throw new WhopParseError(
-			'No bundle IDs found in login page chunk',
-			'bundle_ids',
-			'Expected to find Next.js bundle references like s.bind(s,1234) or s(1234)',
-		)
-	}
-
-	// 7. Map bundle IDs to chunk paths
-	const bundleChunks = bundleIds
-		.map((id) => {
-			const chunk = Array.from(jsPaths).find(
-				(p) => p.includes(`/${id}-`) || p.includes(`chunks/${id}-`),
-			)
-			return chunk ? { id, path: chunk } : null
-		})
-		.filter((item) => item !== null)
-
-	if (bundleChunks.length === 0) {
-		throw new WhopParseError(
-			'No matching chunks found for bundle IDs',
-			'bundle_chunks',
-			`Found ${bundleIds.length} bundle IDs but couldn't match them to chunks`,
-		)
-	}
-
-	// 8. Extract server actions from bundles
+	// 4. Fetch each script and search for server actions
+	const targetActions = ['login', 'verifyTwoFactor', 'resendOtp']
 	const actions: ServerAction[] = []
-	const regex =
+	const foundActions = new Set<string>()
+
+	// Reverse the script URLs list to process them in reverse order
+	const reversedScriptUrls = [...scriptUrls].reverse()
+
+	// Regex to match createServerReference calls with action names
+	// Pattern: createServerReference("hash",...,"actionName")
+	// Matches: createServerReference("hash",...,"actionName") or createServerReference("hash",callServer,void 0,findSourceMapURL,"actionName")
+	const actionRegex =
 		/(?:\(\s*0\s*,\s*)?(?:[\w$]+\.)?createServerReference\)?\(\s*["'](?<id>[0-9a-f]{32,64})["'][^)]*,\s*["'](?<name>[^"']+)["']\s*\)/gi
 
-	for (const chunk of bundleChunks) {
-		let js: string
-		try {
-			const resp = await fetch(`https://whop.com/_next/${chunk.path}`)
-			if (!resp.ok) continue // Skip failed chunks, not critical
-			js = await resp.text()
-		} catch {
-			continue // Skip network errors for individual chunks
+	for (let i = 0; i < reversedScriptUrls.length; i++) {
+		const scriptUrl = reversedScriptUrls[i]
+		if (!scriptUrl) continue
+
+		if (foundActions.size === targetActions.length) {
+			break
 		}
 
-		if (!js.includes('createServerReference')) continue
+		let js: string
+		try {
+			const resp = await fetch(scriptUrl)
+			if (!resp.ok) {
+				console.log(`  ⚠️  Failed to fetch: HTTP ${resp.status}`)
+				continue
+			}
+			js = await resp.text()
+		} catch (error) {
+			console.log(
+				`  ⚠️  Network error: ${error instanceof Error ? error.message : String(error)}`,
+			)
+			continue
+		}
 
-		for (const match of js.matchAll(regex)) {
-			if (match.groups?.id && match.groups?.name) {
-				actions.push({
-					id: match.groups.id,
-					name: match.groups.name,
-				})
+		if (!js.includes('createServerReference')) {
+			continue
+		}
+
+		let foundInThisScript = 0
+		// Search for target actions
+		for (const match of js.matchAll(actionRegex)) {
+			const id = match.groups?.id
+			const name = match.groups?.name
+
+			if (id && name && targetActions.includes(name)) {
+				actions.push({ id, name })
+				foundActions.add(name)
+				foundInThisScript++
 			}
 		}
 	}
 
-	// 9. Validate we found actions
+	// 5. Validate we found all required actions
 	if (actions.length === 0) {
-		throw new WhopServerActionError('No server actions found in any bundle', {
+		throw new WhopServerActionError('No server actions found in any script', {
 			stage: 'extraction',
-			expected: 'createServerReference calls with action IDs',
-			found: `${bundleChunks.length} chunks checked, none contained valid actions`,
+			expected: `createServerReference calls for: ${targetActions.join(', ')}`,
+			found: `${scriptUrls.length} scripts checked, none contained valid actions`,
 		})
 	}
 
-	return actions
+	// Check if we found all target actions
+	const missingActions = targetActions.filter(
+		(action) => !foundActions.has(action),
+	)
+	if (missingActions.length > 0) {
+		throw new WhopServerActionError(
+			`Missing required server actions: ${missingActions.join(', ')}`,
+			{
+				stage: 'extraction',
+				expected: `All actions: ${targetActions.join(', ')}`,
+				found: `Found: ${actions.map((a) => a.name).join(', ')}`,
+			},
+		)
+	}
+
+	// Sort actions by target order for consistent output
+	const sortedActions = targetActions
+		.map((targetName) => actions.find((a) => a.name === targetName))
+		.filter((a): a is ServerAction => a !== undefined)
+
+	return sortedActions
 }
