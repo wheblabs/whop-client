@@ -90,6 +90,7 @@ const company = client.company('biz_xxx')
 const apps = await company.apps.list()
 const experiences = await company.experiences.list()
 const products = await company.products.list()
+const memberships = await company.memberships.list()
 
 // Install an app
 await company.apps.install('app_xxx')
@@ -140,6 +141,18 @@ await client
   .product('prod_xxx')
   .plan('plan_xxx')
   .update({ renewalPrice: '39.99' })
+
+// List memberships with total spend
+const memberships = await company.memberships.list()
+for (const m of memberships.nodes) {
+  console.log(`${m.companyMember.user.username}: $${m.totalSpend}`)
+}
+
+// Filter memberships
+const filtered = await company.memberships.list({
+  filters: { status: 'active' },
+  first: 50
+})
 ```
 
 ## Legacy API (Deprecated)

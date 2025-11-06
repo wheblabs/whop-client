@@ -54,6 +54,19 @@ async function main() {
 		console.log(`    Members: ${product.activeMembersCount}`)
 	}
 
+	// List memberships
+	const memberships = await client.company(companyId).memberships.list({
+		first: 10,
+	})
+	console.log(`\nMemberships: ${memberships.totalCount}`)
+	for (const membership of memberships.nodes) {
+		console.log(
+			`  - ${membership.companyMember.user.username}: $${membership.totalSpend} total spend`,
+		)
+		console.log(`    Product: ${membership.accessPass.title}`)
+		console.log(`    Plan: ${membership.plan.formattedPrice}`)
+	}
+
 	// ============================================
 	// PRODUCT-SCOPED OPERATIONS
 	// ============================================
