@@ -2,12 +2,17 @@ import type { Whop } from '@/client'
 import { WhopAuthError } from '@/lib/errors'
 import { graphqlRequest } from '@/lib/graphql'
 import type { CurrentUser } from '@/types/user'
+import { MeCompanies } from './companies'
 
 /**
  * Me resource - get current authenticated user information
  */
 export class Me {
-	constructor(private readonly client: Whop) {}
+	public readonly companies: MeCompanies
+
+	constructor(private readonly client: Whop) {
+		this.companies = new MeCompanies(client)
+	}
 
 	/**
 	 * Get current authenticated user information

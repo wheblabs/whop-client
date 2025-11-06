@@ -13,20 +13,29 @@ bun add @whoplabs/whop-client
 ```typescript
 import { Whop } from '@whoplabs/whop-client'
 
-const whop = new Whop()
+const client = new Whop()
 
 // First run: authenticate with OTP
-if (!whop.isAuthenticated()) {
-  const ticket = await whop.auth.sendOTP('your@email.com')
-  await whop.auth.verify({ email: 'your@email.com', code: '123456', ticket })
+if (!client.isAuthenticated()) {
+  const ticket = await client.auth.sendOTP('your@email.com')
+  await client.auth.verify({ email: 'your@email.com', code: '123456', ticket })
 }
 
 // Subsequent runs: session auto-loads
-const user = await whop.me.get()
+const user = await client.me.get()
 console.log(`Logged in as ${user.username}`)
 
-const companies = await whop.companies.list()
-const apps = await whop.companies.listApps(companies[0].id)
+// NEW: Builder pattern API
+const companies = await client.me.companies.list()
+const apps = await client.company(companies[0].id).apps.list()
+const products = await client.company(companies[0].id).products.list()
+
+// Chain operations naturally
+await client
+  .company('biz_xxx')
+  .product('prod_xxx')
+  .plan('plan_xxx')
+  .update({ renewalPrice: '39.99' })
 ```
 
 ## Core Concepts
@@ -66,50 +75,36 @@ const whop = Whop.fromTokens(tokens, {
 })
 ```
 
-## Companies
+## Builder Pattern API (Recommended)
+
+The new fluent API makes working with nested resources natural and intuitive:
 
 ```typescript
-// List owned companies
-const companies = await whop.companies.list()
+// List my companies
+const companies = await client.me.companies.list()
 
-// List company's apps
-const apps = await whop.companies.listApps('biz_xxx')
+// Work with a specific company
+const company = client.company('biz_xxx')
 
-// List company's experiences
-const result = await whop.companies.listExperiences('biz_xxx')
-console.log(`Total: ${result.totalCount}`)
-for (const exp of result.experiences) {
-  console.log(`${exp.name} - ${exp.app.name}`)
-}
+// List company resources
+const apps = await company.apps.list()
+const experiences = await company.experiences.list()
+const products = await company.products.list()
+
+// Install an app
+await company.apps.install('app_xxx')
+
+// Get app credentials
+const credentials = await company.app('app_xxx').credentials.get()
+console.log(credentials.apiKey.token)
 
 // Filter experiences by app
-const filtered = await whop.companies.listExperiences('biz_xxx', {
-  appId: 'app_xxx'
-})
+const filtered = await company.experiences.list({ appId: 'app_xxx' })
 
-// List company's access passes (products)
-const passes = await whop.companies.listAccessPasses('biz_xxx')
-console.log(`Total products: ${passes.totalCount}`)
-for (const pass of passes.accessPasses) {
-  console.log(`${pass.title} (${pass.accessPassType})`)
-  console.log(`Members: ${pass.activeMembersCount}`)
-  if (pass.defaultPlan) {
-    console.log(`Price: ${pass.defaultPlan.formattedPrice}`)
-    console.log(`Checkout: ${pass.defaultPlan.directLink}`)
-  }
-}
-
-// Filter by access pass type
-const appProducts = await whop.companies.listAccessPasses('biz_xxx', {
-  accessPassTypes: ['app']  // Only app-based products
-})
-
-// Create a new access pass (product) with auto-generated plan
-const newPass = await whop.companies.createAccessPass({
-  title: 'My Premium Community',
-  companyId: 'biz_xxx',
-  headline: 'Exclusive access',
-  description: 'Join our community',
+// Create a new product
+const newProduct = await company.products.create({
+  title: 'Premium Membership',
+  headline: 'Get exclusive access',
   visibility: 'visible',
   planOptions: {
     baseCurrency: 'usd',
@@ -118,23 +113,18 @@ const newPass = await whop.companies.createAccessPass({
     billingPeriod: 30
   }
 })
-console.log(`Created: ${newPass.title} at /${newPass.route}`)
-if (newPass.defaultPlan) {
-  console.log(`Checkout link: ${newPass.defaultPlan.directLink}`)
-  console.log(`Plan ID: ${newPass.defaultPlan.id}`)
-}
 
-// Update an existing access pass
-const updatedPass = await whop.companies.updateAccessPass({
-  id: 'prod_xxx',
+// Update a product
+await company.product('prod_xxx').update({
   title: 'New Product Name',
-  visibility: 'visible',
-  showMemberCount: true
+  visibility: 'visible'
 })
 
-// Create a plan for an access pass
-const plan = await whop.companies.createPlan({
-  productId: 'prod_xxx',
+// List plans for a product
+const plans = await company.product('prod_xxx').plans.list()
+
+// Create a plan for a product
+const plan = await company.product('prod_xxx').plans.create({
   title: 'Monthly Membership',
   planType: 'renewal',
   visibility: 'visible',
@@ -143,24 +133,27 @@ const plan = await whop.companies.createPlan({
   billingPeriod: 30,
   trialPeriodDays: 7
 })
-console.log(`Checkout link: ${plan.directLink}`)
 
-// Update a plan
-const updatedPlan = await whop.companies.updatePlan({
-  id: 'plan_xxx',
-  renewalPrice: '39.99',
-  setAsDefault: true
-})
+// Update a plan (full chain)
+await client
+  .company('biz_xxx')
+  .product('prod_xxx')
+  .plan('plan_xxx')
+  .update({ renewalPrice: '39.99' })
+```
 
-// List plans for a specific product
-const productPlans = await whop.companies.listAccessPassPlans('biz_xxx', 'prod_xxx')
-for (const plan of productPlans.plans) {
-  console.log(`${plan.planType} - ${plan.formattedPrice}`)
-  console.log(`Active members: ${plan.activeMemberCount}`)
-}
+## Legacy API (Deprecated)
 
-// Install app to company
-const exp = await whop.companies.installApp('biz_xxx', 'app_xxx')
+The old flat API still works for backwards compatibility:
+
+```typescript
+// List owned companies (use client.me.companies.list() instead)
+const companies = await whop.companies.list()
+
+// List company's apps (use client.company(id).apps.list() instead)
+const apps = await whop.companies.listApps('biz_xxx')
+
+// Other legacy methods still available...
 ```
 
 ## Token Storage Options

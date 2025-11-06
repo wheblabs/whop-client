@@ -8,6 +8,7 @@ import { loadSessionSync, saveSession } from '@/lib/session'
 import { Apps } from '@/resources/apps'
 import { Auth } from '@/resources/auth'
 import { Companies } from '@/resources/companies'
+import { CompanyBuilder } from '@/resources/company'
 import { Me } from '@/resources/me'
 import type { AuthTokens, ServerAction, WhopOptions } from '@/types'
 
@@ -358,5 +359,35 @@ export class Whop {
 
 		const sessionPath = path ?? this.sessionPath ?? '.whop-session.json'
 		await saveSession(sessionPath, this._tokens)
+	}
+
+	/**
+	 * Get a company builder for chaining operations
+	 *
+	 * @param companyId - Company ID
+	 * @returns CompanyBuilder instance
+	 *
+	 * @example
+	 * ```typescript
+	 * const whop = new Whop()
+	 *
+	 * // List apps for a company
+	 * const apps = await whop.company('biz_xxx').apps.list()
+	 *
+	 * // Create a product
+	 * const product = await whop.company('biz_xxx').products.create({
+	 *   title: 'Premium Membership'
+	 * })
+	 *
+	 * // Update a plan
+	 * await whop
+	 *   .company('biz_xxx')
+	 *   .product('prod_xxx')
+	 *   .plan('plan_xxx')
+	 *   .update({ renewalPrice: '39.99' })
+	 * ```
+	 */
+	company(companyId: string): CompanyBuilder {
+		return new CompanyBuilder(this, companyId)
 	}
 }
