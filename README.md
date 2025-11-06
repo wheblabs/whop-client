@@ -35,6 +35,8 @@ const apps = await whop.companies.listApps(companies[0].id)
 
 **Tokens refresh automatically.** Every request refreshes expired tokens. Never manually refresh.
 
+**Custom token storage.** Use `onTokenRefresh` callback for database persistence instead of files.
+
 **Errors are typed.** Catch specific errors for better handling.
 
 ## Authentication
@@ -52,6 +54,15 @@ const whop = Whop.fromTokens({
   accessToken: process.env.WHOP_ACCESS_TOKEN,
   csrfToken: process.env.WHOP_CSRF_TOKEN,
   refreshToken: process.env.WHOP_REFRESH_TOKEN,
+})
+
+// Database-backed tokens with auto-refresh
+const tokens = await db.getWhopTokens(userId)
+const whop = Whop.fromTokens(tokens, {
+  onTokenRefresh: async (newTokens) => {
+    // Called automatically when tokens are refreshed
+    await db.saveWhopTokens(userId, newTokens)
+  }
 })
 ```
 
@@ -150,6 +161,62 @@ for (const plan of productPlans.plans) {
 
 // Install app to company
 const exp = await whop.companies.installApp('biz_xxx', 'app_xxx')
+```
+
+## Token Storage Options
+
+### File-based (Default)
+
+```typescript
+// Auto-loads from .whop-session.json
+const whop = new Whop()
+
+// Custom file path
+const whop = new Whop('./my-session.json')
+
+// Disable auto-load
+const whop = new Whop({ autoLoad: false })
+```
+
+### Database-backed (Server environments)
+
+Perfect for server applications where tokens need to be stored per user:
+
+```typescript
+import { Whop } from '@whoplabs/whop-client'
+
+// Load tokens from database
+const tokens = await db.getWhopTokens(userId)
+
+// Create client with refresh callback
+const whop = Whop.fromTokens(tokens, {
+  onTokenRefresh: async (newTokens) => {
+    // Automatically called when tokens are refreshed
+    await db.saveWhopTokens(userId, newTokens)
+    console.log('Tokens updated in database')
+  }
+})
+
+// Now use the client - tokens will auto-refresh and save
+const companies = await whop.companies.list()
+```
+
+The `onTokenRefresh` callback:
+- Called automatically when Whop's API returns new tokens
+- Supports both sync and async functions
+- Errors are caught and logged (won't fail your requests)
+- Works with both `new Whop()` and `Whop.fromTokens()`
+
+### Ephemeral (In-memory only)
+
+```typescript
+const whop = new Whop({ autoLoad: false })
+whop.setTokens({
+  accessToken: '...',
+  csrfToken: '...',
+  refreshToken: '...'
+})
+// Tokens refresh in memory but aren't persisted anywhere
 ```
 
 ## Current User

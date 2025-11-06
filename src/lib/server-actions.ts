@@ -135,7 +135,7 @@ export async function extractServerActions(
 			continue
 		}
 
-		let foundInThisScript = 0
+		let _foundInThisScript = 0
 		// Search for target actions
 		for (const match of js.matchAll(actionRegex)) {
 			const id = match.groups?.id
@@ -144,7 +144,7 @@ export async function extractServerActions(
 			if (id && name && targetActions.includes(name)) {
 				actions.push({ id, name })
 				foundActions.add(name)
-				foundInThisScript++
+				_foundInThisScript++
 			}
 		}
 	}

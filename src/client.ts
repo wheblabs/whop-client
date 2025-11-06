@@ -94,6 +94,9 @@ export class Whop {
 	private _tokens: AuthTokens | undefined = undefined
 	private _serverActions: ServerAction[] | undefined = undefined
 	private readonly sessionPath: string
+	private readonly onTokenRefresh?: (
+		newTokens: AuthTokens,
+	) => void | Promise<void>
 
 	/**
 	 * Create a new Whop client instance
@@ -144,6 +147,7 @@ export class Whop {
 					}
 
 		this.sessionPath = options.sessionPath
+		this.onTokenRefresh = options.onTokenRefresh
 		this.auth = new Auth(this)
 		this.apps = new Apps(this)
 		this.companies = new Companies(this)
@@ -239,7 +243,15 @@ export class Whop {
 	_updateTokens(newTokens: AuthTokens): void {
 		this._tokens = newTokens
 
-		// Auto-save if session was loaded from file
+		// Call custom callback if provided
+		if (this.onTokenRefresh) {
+			Promise.resolve(this.onTokenRefresh(newTokens)).catch((error) => {
+				// Log error but don't throw - token refresh should not fail the request
+				console.error('Error in onTokenRefresh callback:', error)
+			})
+		}
+
+		// Auto-save to session file if path exists
 		if (this.sessionPath) {
 			saveSession(this.sessionPath, newTokens).catch(() => {
 				// Silently ignore save errors during auto-refresh
@@ -278,9 +290,11 @@ export class Whop {
 	 * environment variables, or retrieved from an external system).
 	 *
 	 * @param tokens - Auth tokens to initialize the client with
+	 * @param options - Optional configuration (e.g., onTokenRefresh callback)
 	 * @returns Authenticated Whop client
 	 *
 	 * @example
+	 * **Basic usage:**
 	 * ```typescript
 	 * const tokens = {
 	 *   accessToken: process.env.WHOP_ACCESS_TOKEN,
@@ -291,9 +305,26 @@ export class Whop {
 	 * const whop = Whop.fromTokens(tokens)
 	 * console.log(whop.isAuthenticated()) // true
 	 * ```
+	 *
+	 * @example
+	 * **With database persistence:**
+	 * ```typescript
+	 * const tokens = await db.getWhopTokens(userId)
+	 * const whop = Whop.fromTokens(tokens, {
+	 *   onTokenRefresh: async (newTokens) => {
+	 *     await db.saveWhopTokens(userId, newTokens)
+	 *   }
+	 * })
+	 * ```
 	 */
-	static fromTokens(tokens: AuthTokens): Whop {
-		const client = new Whop()
+	static fromTokens(
+		tokens: AuthTokens,
+		options?: Omit<WhopOptions, 'autoLoad'>,
+	): Whop {
+		const client = new Whop({
+			autoLoad: false,
+			...options,
+		})
 		client.setTokens(tokens)
 		return client
 	}
