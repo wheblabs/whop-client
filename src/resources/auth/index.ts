@@ -180,11 +180,4 @@ export class Auth {
 			console.log(`✓ Session saved to ${path}`)
 		}
 	}
-
-	/**
-	 * Refresh tokens (to be implemented)
-	 */
-	async refresh(): Promise<void> {
-		// TODO: Will implement later
-	}
 }
