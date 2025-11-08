@@ -3,8 +3,14 @@ import {
 	WhopParseError,
 	WhopServerActionError,
 } from '@/lib/errors'
-import { extractServerActions } from '@/lib/server-actions'
+import { serverActionRequest } from '@/lib/rsc'
+import {
+	extractAllServerActions,
+	extractScriptUrls,
+	extractServerActions,
+} from '@/lib/server-actions'
 import { loadSessionSync, saveSession } from '@/lib/session'
+import { AppStore } from '@/resources/app-store'
 import { Apps } from '@/resources/apps'
 import { Auth } from '@/resources/auth'
 import { Companies } from '@/resources/companies'
@@ -87,6 +93,7 @@ import type { AuthTokens, ServerAction, WhopOptions } from '@/types'
  * @public
  */
 export class Whop {
+	public readonly appStore: AppStore
 	public readonly auth: Auth
 	public readonly apps: Apps
 	public readonly companies: Companies
@@ -149,6 +156,7 @@ export class Whop {
 
 		this.sessionPath = options.sessionPath
 		this.onTokenRefresh = options.onTokenRefresh
+		this.appStore = new AppStore(this)
 		this.auth = new Auth(this)
 		this.apps = new Apps(this)
 		this.companies = new Companies(this)
@@ -169,7 +177,8 @@ export class Whop {
 		}
 
 		try {
-			this._serverActions = await extractServerActions('https://whop.com/login')
+			const scriptUrls = await extractScriptUrls('https://whop.com/login')
+			this._serverActions = await extractServerActions(scriptUrls)
 			return this._serverActions
 		} catch (error) {
 			if (
@@ -389,5 +398,86 @@ export class Whop {
 	 */
 	company(companyId: string): CompanyBuilder {
 		return new CompanyBuilder(this, companyId)
+	}
+
+	/**
+	 * Get server actions from a Whop page
+	 *
+	 * @param url - The URL of the Whop page to extract actions from
+	 * @param options - Optional configuration including auth tokens for authenticated requests
+	 * @returns Array of server actions found on the page
+	 *
+	 * @example
+	 * ```typescript
+	 * const whop = new Whop()
+	 *
+	 * // Get actions from login page
+	 * const actions = await whop.getActions('https://whop.com/login')
+	 *
+	 * // Get actions with authentication using getTokens()
+	 * const tokens = whop.getTokens()
+	 * if (tokens) {
+	 *   const actions = await whop.getActions('https://whop.com/dashboard', {
+	 *     tokens
+	 *   })
+	 * }
+	 *
+	 * // Or inline
+	 * const actions = await whop.getActions('https://whop.com/dashboard', {
+	 *   tokens: whop.getTokens()
+	 * })
+	 * ```
+	 */
+	async getActions(
+		url: string,
+		options?: { tokens?: AuthTokens },
+	): Promise<ServerAction[]> {
+		const scriptUrls = await extractScriptUrls(url, options?.tokens)
+		return extractAllServerActions(scriptUrls, options?.tokens)
+	}
+
+	/**
+	 * Execute a server action
+	 *
+	 * @param url - The URL where the server action should be executed
+	 * @param actionId - The server action ID (from getActions)
+	 * @param fieldsOrBody - Form fields as key-value pairs, or raw body (string/object)
+	 * @param options - Optional configuration including auth tokens
+	 * @returns Raw fetch Response
+	 *
+	 * @example
+	 * ```typescript
+	 * const whop = new Whop()
+	 *
+	 * // Execute action with form fields (multipart)
+	 * const response = await whop.executeAction(
+	 *   'https://whop.com/login',
+	 *   'action-id-here',
+	 *   [['1_email', 'user@example.com']]
+	 * )
+	 *
+	 * // Execute action with raw JSON body
+	 * const response = await whop.executeAction(
+	 *   'https://whop.com/dashboard',
+	 *   'action-id-here',
+	 *   '[{"resourceId":"biz_xxx","resourceType":"Company"}]'
+	 * )
+	 *
+	 * // Execute action with JSON object
+	 * const response = await whop.executeAction(
+	 *   'https://whop.com/dashboard',
+	 *   'action-id-here',
+	 *   [{ resourceId: 'biz_xxx', resourceType: 'Company' }],
+	 *   { tokens: whop.getTokens() }
+	 * )
+	 * ```
+	 */
+	async executeAction(
+		url: string,
+		actionId: string,
+		fieldsOrBody: Array<[string, string]> | string | object,
+		options?: { tokens?: AuthTokens },
+	): Promise<Response> {
+		return serverActionRequest(url, actionId, fieldsOrBody, options?.tokens)
 	}
 }

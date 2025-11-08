@@ -1,6 +1,6 @@
 {
 	"name": "@whoplabs/whop-client",
-	"version": "0.3.0",
+	"version": "0.4.0",
 	"description": "Whop account SDK",
 	"homepage": "https://github.com/wheblabs/whop-client#readme",
 	"bugs": {

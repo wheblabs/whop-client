@@ -30,6 +30,13 @@ const companies = await client.me.companies.list()
 const apps = await client.company(companies[0].id).apps.list()
 const products = await client.company(companies[0].id).products.list()
 
+// Browse app store
+const appStore = await client.appStore.query({
+  first: 20,
+  category: 'ai',
+  viewType: 'hub'
+})
+
 // Chain operations naturally
 await client
   .company('biz_xxx')
@@ -270,6 +277,104 @@ const url = await whop.apps.getUrl('app_xxx', 'biz_xxx')
 console.log(url) // https://whop.com/biz_xxx/app-name-123/app
 ```
 
+## App Store
+
+Browse and search public apps from the Whop app store with filtering, sorting, pagination, and search:
+
+```typescript
+// Basic query (first page)
+const result = await whop.appStore.query({
+  first: 20,
+  orderBy: 'total_installs_last_30_days',
+  viewType: 'hub'
+})
+
+console.log(`Found ${result.nodes.length} apps`)
+console.log(`Total: ${result.totalCount}`)
+
+// Filter by category
+const aiApps = await whop.appStore.query({
+  first: 20,
+  category: 'ai',
+  orderBy: 'total_installs_last_30_days',
+  viewType: 'hub'
+})
+
+// Search query
+const searchResults = await whop.appStore.query({
+  first: 20,
+  query: 'analytics',
+  orderBy: 'discoverable_at',
+  viewType: 'hub'
+})
+
+// Pagination (next page)
+const firstPage = await whop.appStore.query({
+  first: 20,
+  viewType: 'hub'
+})
+
+if (firstPage.pageInfo.hasNextPage) {
+  const secondPage = await whop.appStore.query({
+    first: 20,
+    after: firstPage.pageInfo.endCursor,
+    viewType: 'hub'
+  })
+}
+
+// Sort by most active apps
+const mostActive = await whop.appStore.query({
+  first: 10,
+  orderBy: 'daily_active_users',
+  viewType: 'hub'
+})
+
+// Sort by hottest apps (most time spent)
+const hottest = await whop.appStore.query({
+  first: 10,
+  orderBy: 'time_spent_last_24_hours',
+  viewType: 'hub'
+})
+
+// Combined filters
+const filtered = await whop.appStore.query({
+  first: 20,
+  category: 'business-productivity',
+  query: 'crm',
+  orderBy: 'time_spent_last_24_hours',
+  viewType: 'dashboard'
+})
+```
+
+### Available Categories
+
+- `community` - Community apps
+- `business-productivity` - Business and productivity tools
+- `games` - Gaming apps
+- `sports` - Sports-related apps
+- `social-media` - Social media apps
+- `trading` - Trading apps
+- `ai` - AI-powered apps
+- `education` - Educational apps
+- `ecommerce-shopping` - E-commerce and shopping apps
+- `health-fitness` - Health and fitness apps
+- `travel` - Travel apps
+
+### Sort Options
+
+- `total_installs_last_30_days` - Most installs in last 30 days (default)
+- `time_spent_last_24_hours` - Most time spent ("hottest" apps)
+- `discoverable_at` - Most recently discoverable
+- `daily_active_users` - Most daily active users
+
+### View Types
+
+- `hub` - Apps displayed in hub/joined view (default)
+- `dashboard` - Apps displayed in creator dashboard
+- `discover` - Apps displayed in public discovery page
+- `analytics` - Analytics view
+- `dash` - Dash view
+
 ## Error Handling
 
 ```typescript
@@ -308,7 +413,10 @@ import type {
   Plan,
   CreatePlanInput,
   UpdatePlanInput,
-  AccessPassPlansConnection
+  AccessPassPlansConnection,
+  PublicApp,
+  AppStoreResponse,
+  QueryAppStoreOptions
 } from '@whoplabs/whop-client'
 
 const companies: Company[] = await whop.companies.list()
@@ -316,6 +424,7 @@ const creds: AppCredentials = await whop.apps.getCredentials('app_xxx', 'biz_xxx
 const user: CurrentUser = await whop.me.get()
 const experiences: ExperiencesConnection = await whop.companies.listExperiences('biz_xxx')
 const passes: AccessPassesConnection = await whop.companies.listAccessPasses('biz_xxx')
+const appStore: AppStoreResponse = await whop.appStore.query({ first: 20, viewType: 'hub' })
 ```
 
 ## License

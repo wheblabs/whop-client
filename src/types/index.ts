@@ -1,5 +1,6 @@
 export * from './access-passes'
 export * from './app-credentials'
+export * from './app-store'
 export * from './apps'
 export * from './auth'
 export * from './client'
