@@ -96,6 +96,7 @@ const company = client.company('biz_xxx')
 // List company resources
 const apps = await company.apps.list()
 const experiences = await company.experiences.list()
+const forums = await company.forums.list()
 const products = await company.products.list()
 const memberships = await company.memberships.list()
 
@@ -161,6 +162,112 @@ const filtered = await company.memberships.list({
   first: 50
 })
 ```
+
+## Financial Dashboard
+
+Access comprehensive financial analytics for your company's creator dashboard:
+
+```typescript
+// Get all financial metrics
+const data = await client.company('biz_xxx').financials.get({
+  start_date: '2025-10-01',
+  end_date: '2025-10-31'
+})
+
+console.log('Revenue:', data.summary.revenue)
+// { gross_volume: 5000000, net_volume: 4850000, mrr: 120000, arr: 1440000, ... }
+
+console.log('Fees:', data.summary.fees)
+// { payment_processing: 75000, whop_processing: 50000, total_fees: 150000, ... }
+
+console.log('Users:', data.summary.users)
+// { arppu: 2500, arps: 1500, churn_rate: 0.05, trial_conversion_rate: 0.25 }
+
+// Get specific categories only (faster queries)
+const quickCheck = await client.company('biz_xxx').financials.get({
+  start_date: '2025-11-01',
+  end_date: '2025-11-30',
+  categories: ['revenue', 'growth']
+})
+
+// Daily granularity with timezone
+const dailyData = await client.company('biz_xxx').financials.get({
+  start_date: '2025-11-01',
+  end_date: '2025-11-30',
+  interval: 'daily',
+  time_zone: 'America/Los_Angeles'
+})
+
+// Access time-series data for charting
+dailyData.time_series.revenue?.gross_volume?.forEach(point => {
+  console.log(`${point.t}: $${point.v / 100}`)
+})
+```
+
+### Available Categories
+
+- `revenue` - MRR, ARR, gross/net volume, churned revenue
+- `fees` - Processing, platform, affiliate, dispute fees, refunds
+- `users` - ARPPU, ARPS, churn rate, trial conversion
+- `growth` - New users, user growth
+- `payments` - Successful payments, payment breakdown
+- `traffic` - Page visits
+- `affiliates` - Revenue/user splits by source
+- `top_performers` - Top customers and affiliates
+
+### Financial Data Response
+
+```typescript
+interface FinancialData {
+  summary: {
+    revenue?: {
+      gross_volume: number      // Total sales (cents)
+      net_volume: number        // After fees (cents)
+      mrr: number              // Monthly Recurring Revenue (cents)
+      arr: number              // Annual Recurring Revenue (cents)
+      churned_revenue: number  // Lost revenue (cents)
+    }
+    fees?: {
+      payment_processing: number
+      whop_processing: number
+      affiliate: number
+      dispute: number
+      tax_withheld: number
+      refunded: number
+      total_fees: number       // Sum of all fees (cents)
+    }
+    users?: {
+      arppu: number            // Average Revenue Per Paying User (cents)
+      arps: number             // Average Revenue Per Subscription (cents)
+      churn_rate: number       // 0-1 decimal (0.05 = 5%)
+      trial_conversion_rate: number  // 0-1 decimal
+    }
+    growth?: {
+      new_users: number
+      users_growth: number     // Net change in active users
+    }
+    payments?: {
+      successful: number       // Count of successful payments
+      by_status: Array<{ status: string, amount: number }>
+    }
+    traffic?: {
+      page_visits: number
+    }
+    top_performers?: {
+      customers: Array<{ name: string, username: string, sales: number }>
+      affiliates: Array<{ name: string, username: string, sales: number }>
+    }
+  }
+  time_series: {
+    // Full time-series data for each metric (for charting)
+    revenue?: { gross_volume?: DataPoint[], mrr?: DataPoint[], ... }
+    // ... other categories
+  }
+  details_available: boolean
+}
+```
+
+**Note:** All monetary values are in cents (e.g., `10000` = $100.00). Divide by 100 for display.
 
 ## Legacy API (Deprecated)
 
@@ -375,6 +482,142 @@ const filtered = await whop.appStore.query({
 - `analytics` - Analytics view
 - `dash` - Dash view
 
+## Forums
+
+Work with forum experiences, posts, and comments:
+
+```typescript
+// List forum experiences for a company
+const forums = await whop.company('biz_xxx').forums.list()
+console.log(`Found ${forums.length} forum experiences`)
+
+// Access a specific forum
+const forum = whop.company('biz_xxx').forum('exp_123')
+
+// List posts (without comments)
+const postsResult = await forum.posts.list({
+  limit: 20
+})
+
+console.log(`Found ${postsResult.posts.length} posts`)
+console.log(`Has next page: ${postsResult.pagination.hasNextPage}`)
+
+// List posts with comments
+const postsWithComments = await forum.posts.list({
+  limit: 10,
+  withComments: true
+})
+
+for (const post of postsWithComments.posts) {
+  console.log(`${post.title}: ${post.comments.length} comments`)
+  for (const comment of post.comments) {
+    console.log(`  - ${comment.user.username}: ${comment.content}`)
+  }
+}
+
+// Paginate posts
+let before: string | undefined = undefined
+do {
+  const page = await forum.posts.list({ limit: 20, before })
+  // Process posts...
+  if (page.pagination.hasNextPage) {
+    before = page.pagination.nextBefore!
+  } else {
+    break
+  }
+} while (before)
+
+// Get comments for a specific post
+const post = forum.post('post_456')
+const commentsResult = await post.comments.list({ limit: 20 })
+
+console.log(`Found ${commentsResult.posts.length} comments`)
+console.log(`Total: ${commentsResult.totalCount}`)
+
+// Paginate comments
+let commentBefore: string | undefined = undefined
+do {
+  const commentPage = await post.comments.list({ 
+    limit: 20, 
+    before: commentBefore 
+  })
+  // Process comments...
+  if (commentPage.pagination.hasNextPage) {
+    commentBefore = commentPage.pagination.nextBefore!
+  } else {
+    break
+  }
+} while (commentBefore)
+```
+
+### Forum Types
+
+```typescript
+import type {
+  ForumExperience,
+  ForumPost,
+  ForumPostsResponse,
+  ForumPostsWithCommentsResponse,
+  PostWithComments,
+  TreePost,
+  ForumCommentsResponse,
+  ForumPostsListOptions,
+  ForumCommentsListOptions
+} from '@whoplabs/whop-client'
+
+const forums: ForumExperience[] = await whop.company('biz_xxx').forums.list()
+const posts: ForumPostsResponse = await forum.posts.list({ limit: 20 })
+const postsWithComments: ForumPostsWithCommentsResponse = await forum.posts.list({ 
+  limit: 20, 
+  withComments: true 
+})
+const comments: ForumCommentsResponse = await post.comments.list({ limit: 20 })
+```
+
+### Forum Post Structure
+
+Each `ForumPost` includes:
+- Basic info: `id`, `title`, `content`, `richContent`, `createdAt`
+- Metadata: `commentCount`, `viewCount`, `pinned`, `isDeleted`, `isEdited`
+- User: `user.name`, `user.username`, `user.profilePicture`
+- Reactions: `reactionCounts`, `ownEmojiReactions`, `ownVoteReactions`
+- Media: `gifs`, `muxAssets`, `attachments`
+- Other: `lineItem`, `poll`, `mentionedUserIds`
+
+### Comment Tree Structure
+
+When `withComments: true`, comments are returned as a nested tree:
+
+```typescript
+interface PostWithComments extends ForumPost {
+  comments: TreePost[]  // Nested tree structure
+}
+
+interface TreePost extends ForumPost {
+  depth: number          // Depth in tree (0 = top-level comment)
+  children: TreePost[]   // Nested replies
+  isOrphan: boolean      // Parent not in current data
+  isChildLess: boolean   // Has more comments not loaded
+}
+```
+
+### Error Handling
+
+Forum-specific errors include detailed context:
+
+```typescript
+import { WhopForumError } from '@whoplabs/whop-client'
+
+try {
+  await forum.posts.list()
+} catch (error) {
+  if (error instanceof WhopForumError) {
+    console.error(error.getDetailedMessage())
+    // Includes: experienceId, feedId, postId, commentId if available
+  }
+}
+```
+
 ## Error Handling
 
 ```typescript
@@ -416,7 +659,16 @@ import type {
   AccessPassPlansConnection,
   PublicApp,
   AppStoreResponse,
-  QueryAppStoreOptions
+  QueryAppStoreOptions,
+  ForumExperience,
+  ForumPost,
+  ForumPostsResponse,
+  ForumPostsWithCommentsResponse,
+  PostWithComments,
+  TreePost,
+  ForumCommentsResponse,
+  ForumPostsListOptions,
+  ForumCommentsListOptions
 } from '@whoplabs/whop-client'
 
 const companies: Company[] = await whop.companies.list()

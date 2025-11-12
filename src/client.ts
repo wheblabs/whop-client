@@ -3,6 +3,7 @@ import {
 	WhopParseError,
 	WhopServerActionError,
 } from '@/lib/errors'
+import { graphqlRequest } from '@/lib/graphql'
 import { serverActionRequest } from '@/lib/rsc'
 import {
 	extractAllServerActions,
@@ -398,6 +399,82 @@ export class Whop {
 	 */
 	company(companyId: string): CompanyBuilder {
 		return new CompanyBuilder(this, companyId)
+	}
+
+	/**
+	 * Execute an arbitrary GraphQL query against Whop's API
+	 *
+	 * @param options - GraphQL query options
+	 * @param options.query - The GraphQL query string
+	 * @param options.variables - Optional query variables
+	 * @param options.operationName - Optional operation name
+	 * @returns Typed GraphQL response data
+	 * @throws {WhopAuthError} If not authenticated
+	 *
+	 * @example
+	 * ```typescript
+	 * const whop = new Whop()
+	 *
+	 * // Execute a custom query
+	 * const result = await whop.graphql({
+	 *   query: `
+	 *     query GetCompany($id: ID!) {
+	 *       company(id: $id) {
+	 *         id
+	 *         name
+	 *       }
+	 *     }
+	 *   `,
+	 *   variables: { id: 'biz_xxx' },
+	 *   operationName: 'GetCompany'
+	 * })
+	 *
+	 * console.log(result.company.name)
+	 * ```
+	 *
+	 * @example
+	 * **With TypeScript typing:**
+	 * ```typescript
+	 * interface CompanyResponse {
+	 *   company: {
+	 *     id: string
+	 *     name: string
+	 *   }
+	 * }
+	 *
+	 * const result = await whop.graphql<CompanyResponse>({
+	 *   query: `...`,
+	 *   variables: { id: 'biz_xxx' }
+	 * })
+	 *
+	 * // result.company is now typed
+	 * ```
+	 */
+	async graphql<T = any>(options: {
+		query: string
+		variables?: Record<string, unknown>
+		operationName?: string
+	}): Promise<T> {
+		if (!this._tokens) {
+			throw new WhopAuthError(
+				'Cannot execute GraphQL query: not authenticated',
+				'NOT_AUTHENTICATED',
+			)
+		}
+
+		// Use operation name from options or extract from query (for URL)
+		const operationName = options.operationName || 'graphql'
+
+		return graphqlRequest<T>(
+			operationName,
+			{
+				query: options.query,
+				variables: options.variables,
+				operationName: options.operationName,
+			},
+			this._tokens,
+			(newTokens) => this._updateTokens(newTokens),
+		)
 	}
 
 	/**

@@ -42,3 +42,20 @@ export type {
 	PageInfo,
 } from '@/types/companies'
 export type { CreateAppInput, CreatedApp } from '@/types/create-app'
+export type {
+	AffiliateMetrics,
+	FeeMetrics,
+	FinancialCategory,
+	FinancialData,
+	FinancialDataSummary,
+	FinancialInterval,
+	FinancialTimeSeries,
+	GetFinancialDataParams,
+	GrowthMetrics,
+	MetricDataPoint,
+	PaymentMetrics,
+	RevenueMetrics,
+	TopPerformersMetrics,
+	TrafficMetrics,
+	UserMetrics,
+} from '@/types/financials'

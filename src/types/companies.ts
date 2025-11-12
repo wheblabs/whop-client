@@ -60,3 +60,17 @@ export interface ListAppsOptions {
 	/** Cursor to paginate backward from */
 	before?: string
 }
+
+/**
+ * Options for listing companies
+ */
+export interface ListCompaniesOptions {
+	/** Role filter: 'admin' for companies you own/manage, 'member' for companies you're a customer of */
+	role?: 'admin' | 'member'
+	/** Number of companies to fetch */
+	first?: number
+	/** Cursor for pagination */
+	after?: string
+	/** Filter by membership status (only applies when role: 'member') */
+	status?: 'active' | 'inactive'
+}

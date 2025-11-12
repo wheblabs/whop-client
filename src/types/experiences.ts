@@ -9,6 +9,7 @@ export interface ExperienceImageSrcset {
 export interface ExperienceApp {
 	id: string
 	name: string
+	internalIdentifier: string | null
 	icon: {
 		sourceUrl: string
 	} | null
