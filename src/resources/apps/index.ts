@@ -193,7 +193,7 @@ export class Apps {
 
 		// GraphQL query
 		const query = `
-      query fetchCompanyApp($companyId: ID!, $appId: ID!) {
+      query fetchCompanyAppCredentials($companyId: ID!, $appId: ID!) {
         company(id: $companyId) {
           app(id: $appId) {
             id
@@ -213,10 +213,17 @@ export class Apps {
             experiencePath: viewPath(viewType: hub)
             discoverPath: viewPath(viewType: discover)
             dashboardPath: viewPath(viewType: dashboard)
-            apiKey {
+            defaultAuthorizedApiKey {
               id
-              token
+              name
+              obfuscatedSecretKey
               createdAt
+            }
+            accessPass {
+              id
+              route
+              title
+              marketplaceStatus
             }
             requestedPermissions {
               permissionAction {
@@ -229,7 +236,7 @@ export class Apps {
             stats {
               dau
               mau
-              timeSpentLast24Hours: timeSpentLast24HoursInSeconds
+              timeSpentLast24HoursInSeconds
               wau
             }
             agentUsers {
@@ -248,27 +255,90 @@ export class Apps {
 		// Make request
 		interface FetchCompanyAppResponse {
 			company: {
-				app: Omit<AppCredentials, 'agentUsers'> & {
-					agentUsers: { nodes: AppCredentials['agentUsers'] }
-				}
+				app:
+					| (Omit<AppCredentials, 'agentUsers' | 'stats' | 'apiKey'> & {
+							stats: {
+								dau: number
+								mau: number
+								timeSpentLast24HoursInSeconds: number
+								wau: number
+							}
+							agentUsers: { nodes: AppCredentials['agentUsers'] }
+							defaultAuthorizedApiKey: {
+								id: string
+								name: string | null
+								obfuscatedSecretKey: string | null
+								createdAt: string
+							} | null
+					  })
+					| null
 			}
 		}
 
 		const response = await graphqlRequest<FetchCompanyAppResponse>(
-			'fetchCompanyApp',
+			'fetchCompanyAppCredentials',
 			{
 				query,
 				variables: { companyId, appId },
-				operationName: 'fetchCompanyApp',
+				operationName: 'fetchCompanyAppCredentials',
 			},
 			tokens,
 			(newTokens) => this.client._updateTokens(newTokens),
 		)
 
-		// Transform agentUsers.nodes → agentUsers
+		const app = response.company?.app
+		if (!app) {
+			throw new Error('App not found for the provided company/app id pair')
+		}
+
+		if (!app.defaultAuthorizedApiKey?.id) {
+			throw new Error(
+				'No authorized API key found for this app. Visit the developer dashboard to create one.',
+			)
+		}
+
+		const apiKeyDetails = await this.retrieveAuthorizedApiKey(
+			app.defaultAuthorizedApiKey.id,
+			tokens,
+		)
+
+		if (!apiKeyDetails?.secretKey) {
+			throw new Error(
+				'Failed to retrieve the API key secret. Try regenerating the key from the developer dashboard.',
+			)
+		}
+
+		const apiKey = {
+			id: apiKeyDetails.id,
+			token: apiKeyDetails.secretKey,
+			obfuscatedSecretKey: apiKeyDetails.obfuscatedSecretKey ?? null,
+			createdAt: new Date(apiKeyDetails.createdAt).getTime(),
+		}
+
 		return {
-			...response.company.app,
-			agentUsers: response.company.app.agentUsers.nodes,
+			id: app.id,
+			name: app.name,
+			description: app.description,
+			baseUrl: app.baseUrl,
+			baseDevUrl: app.baseDevUrl,
+			domainId: app.domainId,
+			status: app.status,
+			verified: app.verified,
+			usingDefaultIcon: app.usingDefaultIcon,
+			icon: app.icon,
+			experiencePath: app.experiencePath,
+			discoverPath: app.discoverPath,
+			dashboardPath: app.dashboardPath,
+			apiKey,
+			agentUsers: app.agentUsers.nodes,
+			requestedPermissions: app.requestedPermissions,
+			stats: {
+				dau: app.stats.dau,
+				mau: app.stats.mau,
+				wau: app.stats.wau,
+				timeSpentLast24Hours: app.stats.timeSpentLast24HoursInSeconds,
+			},
+			accessPass: app.accessPass ?? null,
 		}
 	}
 
@@ -321,40 +391,13 @@ export class Apps {
       mutation createApp($input: CreateAppInput!) {
         createApp(input: $input) {
           id
-          name
-          description
-          baseUrl
-          baseDevUrl
-          status
-          apiKeys {
-            nodes {
-              id
-              token
-              createdAt
-            }
-          }
-          agentUsers {
-            nodes {
-              id
-              name
-              username
-            }
-          }
-          company {
-            id
-          }
-          accessPass {
-            id
-          }
         }
       }
     `
 
-		// Make request
 		interface CreateAppResponse {
-			createApp: Omit<CreatedApp, 'apiKeys' | 'agentUsers'> & {
-				apiKeys: { nodes: CreatedApp['apiKeys'] }
-				agentUsers: { nodes: CreatedApp['agentUsers'] }
+			createApp: {
+				id: string
 			}
 		}
 
@@ -365,11 +408,26 @@ export class Apps {
 			(newTokens) => this.client._updateTokens(newTokens),
 		)
 
-		// Transform nodes wrappers
+		const createdAppId = response.createApp.id
+
+		// Fetch the latest credentials so consumers receive a fully-hydrated response
+		const credentials = await this.getCredentials(createdAppId, input.companyId)
+
 		return {
-			...response.createApp,
-			apiKeys: response.createApp.apiKeys.nodes,
-			agentUsers: response.createApp.agentUsers.nodes,
+			id: credentials.id,
+			name: credentials.name,
+			description: credentials.description,
+			baseUrl: credentials.baseUrl,
+			baseDevUrl: credentials.baseDevUrl,
+			status: credentials.status,
+			apiKeys: [credentials.apiKey],
+			agentUsers: credentials.agentUsers,
+			company: {
+				id: input.companyId,
+			},
+			accessPass: credentials.accessPass
+				? { id: credentials.accessPass.id }
+				: { id: '' },
 		}
 	}
 
@@ -524,5 +582,48 @@ export class Apps {
 			.toLowerCase()
 
 		return `https://whop.com/${companyId}/${transformedAppName}-${experienceId}/app`
+	}
+
+	private async retrieveAuthorizedApiKey(
+		apiKeyId: string,
+		tokens: NonNullable<ReturnType<Whop['getTokens']>>,
+	): Promise<{
+		id: string
+		secretKey: string | null
+		obfuscatedSecretKey: string | null
+		createdAt: string
+	}> {
+		const query = `
+      query coreRetrieveAuthorizedApiKey($id: ID!) {
+        retrieveAuthorizedApiKey(id: $id) {
+          id
+          secretKey
+          obfuscatedSecretKey
+          createdAt
+        }
+      }
+    `
+
+		interface RetrieveAuthorizedApiKeyResponse {
+			retrieveAuthorizedApiKey: {
+				id: string
+				secretKey: string | null
+				obfuscatedSecretKey: string | null
+				createdAt: string
+			}
+		}
+
+		const response = await graphqlRequest<RetrieveAuthorizedApiKeyResponse>(
+			'coreRetrieveAuthorizedApiKey',
+			{
+				query,
+				variables: { id: apiKeyId },
+				operationName: 'coreRetrieveAuthorizedApiKey',
+			},
+			tokens,
+			(newTokens) => this.client._updateTokens(newTokens),
+		)
+
+		return response.retrieveAuthorizedApiKey
 	}
 }

@@ -21,6 +21,7 @@ export interface AppCredentials {
 	agentUsers: AgentUser[]
 	requestedPermissions: RequestedPermission[]
 	stats: AppCredentialStats
+	accessPass?: AppCredentialAccessPass | null
 }
 
 export interface AppCredentialIcon {
@@ -32,7 +33,15 @@ export interface AppCredentialIcon {
 export interface ApiKey {
 	id: string
 	token: string
+	obfuscatedSecretKey?: string | null
 	createdAt: number
+}
+
+export interface AppCredentialAccessPass {
+	id: string
+	route?: string | null
+	title?: string | null
+	marketplaceStatus?: string | null
 }
 
 export interface RequestedPermission {
