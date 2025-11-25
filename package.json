@@ -1,6 +1,6 @@
 {
 	"name": "@whoplabs/whop-client",
-	"version": "0.5.2",
+	"version": "0.5.3",
 	"description": "Whop account SDK",
 	"homepage": "https://github.com/wheblabs/whop-client#readme",
 	"bugs": {
@@ -15,7 +15,8 @@
 		"url": "https://github.com/wheblabs/whop-client.git"
 	},
 	"scripts": {
-		"build": "bunup",
+		"build": "bunup && bun run build:fix-duplicate",
+		"build:fix-duplicate": "node -e \"const fs=require('fs');const f='dist/shared/chunk-7jxqf0jv.js';let c=fs.readFileSync(f,'utf8');c=c.replace(/^export {\\s*\\n\\s*graphqlRequest\\s*\\n};\\s*\\n/gm,'');fs.writeFileSync(f,c);\"",
 		"dev": "bunup --watch",
 		"prepare": "bun simple-git-hooks",
 		"lint": "biome check .",
