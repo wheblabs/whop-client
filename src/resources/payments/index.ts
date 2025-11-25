@@ -77,6 +77,19 @@ export class Payments {
 			}
 
 			// Use REST API endpoint (matching @whop/api SDK behavior)
+			const requestBody = {
+				plan_id: options.planId,
+				metadata: options.metadata || {},
+			}
+
+			console.log('[payments] Creating checkout session:', {
+				url: 'https://api.whop.com/api/v2/checkout_sessions',
+				companyId: options.companyId,
+				onBehalfOfUserId: options.onBehalfOfUserId,
+				planId: options.planId,
+				hasApiKey: !!options.apiKey,
+			})
+
 			const response = await fetch(
 				'https://api.whop.com/api/v2/checkout_sessions',
 				{
@@ -87,25 +100,39 @@ export class Payments {
 						'X-Company-Id': options.companyId,
 						'X-On-Behalf-Of-User-Id': options.onBehalfOfUserId,
 					},
-					body: JSON.stringify({
-						plan_id: options.planId,
-						metadata: options.metadata || {},
-					}),
+					body: JSON.stringify(requestBody),
 				},
 			)
 
 			if (!response.ok) {
 				const errorText = await response.text()
-				let errorMessage = `Failed to create checkout session: ${response.status}`
+				let errorMessage = `Failed to create checkout session: ${response.status} ${response.statusText}`
 				try {
 					const errorData = JSON.parse(errorText)
+					console.error(
+						'[payments] API error response:',
+						JSON.stringify(errorData, null, 2),
+					)
 					if (errorData.message) {
-						errorMessage += ` - ${errorData.message}`
+						errorMessage = errorData.message
 					} else if (errorData.error) {
-						errorMessage += ` - ${errorData.error}`
+						if (typeof errorData.error === 'string') {
+							errorMessage = errorData.error
+						} else if (errorData.error.message) {
+							errorMessage = errorData.error.message
+						} else {
+							errorMessage = JSON.stringify(errorData.error)
+						}
+					} else if (errorData.detail) {
+						errorMessage = errorData.detail
+					} else {
+						errorMessage += ` - ${JSON.stringify(errorData)}`
 					}
-				} catch {
-					errorMessage += ` - ${errorText.substring(0, 200)}`
+				} catch (_parseError) {
+					console.error('[payments] Failed to parse error response:', errorText)
+					if (errorText) {
+						errorMessage += ` - ${errorText.substring(0, 200)}`
+					}
 				}
 				throw new Error(errorMessage)
 			}
@@ -123,6 +150,39 @@ export class Payments {
 				return {
 					id: data.id,
 					url: data.url,
+				}
+			}
+			// Handle format: { id, purchase_url, ... }
+			if (data.id && data.purchase_url) {
+				return {
+					id: data.id,
+					url: data.purchase_url,
+				}
+			}
+			// Handle format: { id, redirect_url, ... }
+			if (data.id && data.redirect_url) {
+				return {
+					id: data.id,
+					url: data.redirect_url,
+				}
+			}
+			// If we have an id but no URL, try to construct one or use the id
+			if (data.id) {
+				console.warn(
+					'[payments] Response has id but no URL field. Available fields:',
+					Object.keys(data),
+				)
+				// Try to construct URL from plan_id if available
+				if (data.plan_id) {
+					return {
+						id: data.id,
+						url: `https://whop.com/checkout/${data.plan_id}/?session=${data.id}`,
+					}
+				}
+				// Fallback: return id and let caller handle URL construction
+				return {
+					id: data.id,
+					url: `https://whop.com/checkout/?session=${data.id}`,
 				}
 			}
 

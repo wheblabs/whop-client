@@ -371,9 +371,8 @@ export class ForumComments {
 			const hasNextPage = comments.length === limit
 			const nextBefore =
 				hasNextPage && comments.length > 0
-					? // biome-ignore lint/style/noNonNullAssertion: length check guarantees element exists
-						(
-							BigInt(comments[comments.length - 1]!.createdAt) - BigInt(1)
+					? (
+							BigInt(comments[comments.length - 1]?.createdAt ?? 0) - BigInt(1)
 						).toString()
 					: null
 
