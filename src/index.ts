@@ -10,6 +10,10 @@ export {
 	WhopServerActionNotFoundError,
 } from '@/lib/errors'
 export type {
+	CreateCheckoutSessionOptions,
+	CreateCheckoutSessionResponse,
+} from '@/resources/payments'
+export type {
 	AgentUser,
 	ApiKey,
 	AppCredentialIcon,

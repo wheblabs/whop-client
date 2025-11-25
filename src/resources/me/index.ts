@@ -51,6 +51,7 @@ export class Me {
           user {
             email
             id
+            name
             profilePic16: profilePicSrcset(style: s16, allowAnimation: true) {
               original
               double

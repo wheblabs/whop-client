@@ -17,6 +17,7 @@ import { Auth } from '@/resources/auth'
 import { Companies } from '@/resources/companies'
 import { CompanyBuilder } from '@/resources/company'
 import { Me } from '@/resources/me'
+import { Payments } from '@/resources/payments'
 import type { AuthTokens, ServerAction, WhopOptions } from '@/types'
 
 /**
@@ -99,6 +100,7 @@ export class Whop {
 	public readonly apps: Apps
 	public readonly companies: Companies
 	public readonly me: Me
+	public readonly payments: Payments
 
 	private _tokens: AuthTokens | undefined = undefined
 	private _serverActions: ServerAction[] | undefined = undefined
@@ -162,6 +164,7 @@ export class Whop {
 		this.apps = new Apps(this)
 		this.companies = new Companies(this)
 		this.me = new Me(this)
+		this.payments = new Payments(this)
 
 		if (options.autoLoad) {
 			// Load session synchronously from file
