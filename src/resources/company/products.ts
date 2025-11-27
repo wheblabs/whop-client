@@ -42,11 +42,10 @@ interface FetchCompanyAccessPassesResponse {
 
 /**
  * GraphQL response structure for createAccessPass
+ * Note: The API returns fields directly, not wrapped in accessPass
  */
 interface CreateAccessPassResponse {
-	createAccessPass: {
-		accessPass: CreatedAccessPass
-	}
+	createAccessPass: CreatedAccessPass
 }
 
 /**
@@ -166,17 +165,15 @@ export class CompanyProducts {
 		const mutation = `
       mutation coreCreateAccessPass($input: CreateAccessPassInput!) {
         createAccessPass(input: $input) {
-          accessPass {
+          id
+          title
+          headline
+          route
+          visibility
+          defaultPlan {
             id
-            title
-            headline
-            route
-            visibility
-            defaultPlan {
-              id
-              formattedPrice
-              directLink
-            }
+            formattedPrice
+            directLink
           }
         }
       }
@@ -196,7 +193,7 @@ export class CompanyProducts {
 			(newTokens) => this.client._updateTokens(newTokens),
 		)
 
-		return response.createAccessPass.accessPass
+		return response.createAccessPass
 	}
 
 	/**
