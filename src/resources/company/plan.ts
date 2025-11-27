@@ -5,11 +5,10 @@ import type { Plan, UpdatePlanInput } from '@/types/plans'
 
 /**
  * GraphQL response structure for updatePlan
+ * Note: The API returns fields directly, not wrapped in plan
  */
 interface UpdatePlanResponse {
-	updatePlan: {
-		plan: Plan
-	}
+	updatePlan: Plan
 }
 
 /**
@@ -48,13 +47,13 @@ export class PlanBuilder {
 		const mutation = `
       mutation updatePlan($input: UpdatePlanInput!) {
         updatePlan(input: $input) {
-          plan {
-            id
-            planType
-            formattedPrice
-            directLink
-            visibility
-          }
+          id
+          planType
+          formattedPrice
+          directLink
+          visibility
+          initialPrice
+          renewalPrice
         }
       }
     `
@@ -73,6 +72,6 @@ export class PlanBuilder {
 			(newTokens) => this.client._updateTokens(newTokens),
 		)
 
-		return response.updatePlan.plan
+		return response.updatePlan // Returns Plan directly
 	}
 }

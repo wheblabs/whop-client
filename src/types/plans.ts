@@ -42,16 +42,18 @@ export interface AffiliateSettingsInput {
 }
 
 export interface CreatePlanInput {
+	/** Company ID (required) */
+	companyId: string
 	/** Product/access pass ID (required) */
 	productId: string
-	/** Plan title (required) */
-	title: string
+	/** Plan title (optional) */
+	title?: string
 	/** Plan type (required) */
 	planType: PlanType
 	/** Visibility (required) */
 	visibility: Visibility
-	/** Currency */
-	currency?: Currency
+	/** Base currency (e.g., 'USD') */
+	baseCurrency?: Currency
 	/** Recurring/one-time price */
 	renewalPrice?: string
 	/** Setup fee */
@@ -257,11 +259,15 @@ export interface AccessPassPlansConnection {
 	plans: AccessPassPlan[]
 	pageInfo: {
 		endCursor: string | null
-		startCursor: string | null
+		startCursor?: string | null
 		hasNextPage: boolean
 	}
 }
 
+/**
+ * Plan as returned by createPlan/updatePlan mutations
+ * Matches the UpsertPlan fragment from fe-monorepo
+ */
 export interface Plan {
 	id: string
 	directLink: string
@@ -277,6 +283,8 @@ export interface Plan {
 	}
 	initialPrice: string | null
 	renewalPrice: string | null
+	strikeThroughInitialPrice?: string | null
+	strikeThroughRenewalPrice?: string | null
 	offerCancelDiscount: boolean
 	cancelDiscountPercentage: number | null
 	cancelDiscountIntervals: number | null

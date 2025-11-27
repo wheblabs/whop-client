@@ -15,31 +15,35 @@ import { PlanBuilder } from './plan'
 
 /**
  * GraphQL response structure for updateAccessPass
+ * Note: The API returns fields directly, not wrapped in accessPass
  */
 interface UpdateAccessPassResponse {
-	updateAccessPass: {
-		accessPass: UpdatedAccessPass
-	}
+	updateAccessPass: UpdatedAccessPass
 }
 
 /**
  * GraphQL response structure for listAccessPassPlans
+ * Updated to match Whop's actual schema from fe-monorepo
  */
 interface ListAccessPassPlansResponse {
 	company: {
 		accessPass: {
 			plans: {
-				plans: Array<{
+				nodes: Array<{
 					id: string
 					planType: string
 					formattedPrice: string
-					directLink: string
+					initialPrice: string | null
+					baseCurrency: string
 					visibility: string
+					releaseMethod: string
 					activeMemberCount: number
+					expirationDays: number | null
+					trialPeriodDays: number | null
+					internalNotes: string | null
 				}>
 				pageInfo: {
 					endCursor: string | null
-					startCursor: string | null
 					hasNextPage: boolean
 				}
 			}
@@ -49,11 +53,10 @@ interface ListAccessPassPlansResponse {
 
 /**
  * GraphQL response structure for createPlan
+ * Note: The API returns fields directly, not wrapped in plan
  */
 interface CreatePlanResponse {
-	createPlan: {
-		plan: Plan
-	}
+	createPlan: Plan
 }
 
 /**
@@ -64,7 +67,9 @@ export class ProductBuilder {
 		list: (
 			options?: ListAccessPassPlansOptions,
 		) => Promise<AccessPassPlansConnection>
-		create: (input: Omit<CreatePlanInput, 'productId'>) => Promise<Plan>
+		create: (
+			input: Omit<CreatePlanInput, 'productId' | 'companyId'>,
+		) => Promise<Plan>
 	}
 
 	constructor(
@@ -106,13 +111,11 @@ export class ProductBuilder {
 		const mutation = `
       mutation updateAccessPass($input: UpdateAccessPassInput!) {
         updateAccessPass(input: $input) {
-          accessPass {
-            id
-            title
-            headline
-            visibility
-            route
-          }
+          id
+          title
+          headline
+          visibility
+          route
         }
       }
     `
@@ -131,11 +134,12 @@ export class ProductBuilder {
 			(newTokens) => this.client._updateTokens(newTokens),
 		)
 
-		return response.updateAccessPass.accessPass
+		return response.updateAccessPass // Returns directly
 	}
 
 	/**
 	 * List plans for this product
+	 * Updated to match Whop's actual GraphQL schema from fe-monorepo
 	 */
 	private async listPlans(
 		options?: ListAccessPassPlansOptions,
@@ -148,22 +152,28 @@ export class ProductBuilder {
 			)
 		}
 
+		// Updated to match Whop's actual GraphQL schema
+		// See: fe-monorepo/packages/gql/client-operations/creator-dashboard/promo-codes/fetch-access-pass-plans.graphql
 		const query = `
-      query coreFetchAccessPassPlans($companyId: String!, $accessPassId: String!, $first: Int, $after: String) {
+      query coreFetchAccessPassPlans($companyId: ID!, $accessPassId: ID!, $first: Int, $after: String) {
         company(id: $companyId) {
           accessPass(id: $accessPassId) {
-            plans(first: $first, after: $after) {
-              plans {
+            plans(order: active_members_count, direction: desc, first: $first, after: $after) {
+              nodes {
                 id
-                planType
+                initialPrice
                 formattedPrice
-                directLink
+                baseCurrency
+                expirationDays
+                trialPeriodDays
                 visibility
+                internalNotes
+                releaseMethod
+                planType
                 activeMemberCount
               }
               pageInfo {
                 endCursor
-                startCursor
                 hasNextPage
               }
             }
@@ -190,15 +200,31 @@ export class ProductBuilder {
 			(newTokens) => this.client._updateTokens(newTokens),
 		)
 
-		return response.company.accessPass
-			.plans as unknown as AccessPassPlansConnection
+		// Map 'nodes' to 'plans' for backward compatibility
+		const plansData = response.company.accessPass.plans
+		return {
+			plans: plansData.nodes.map((node) => ({
+				id: node.id,
+				initialPrice: node.initialPrice,
+				formattedPrice: node.formattedPrice,
+				baseCurrency: node.baseCurrency,
+				expirationDays: node.expirationDays ?? null,
+				trialPeriodDays: node.trialPeriodDays ?? null,
+				visibility: node.visibility,
+				internalNotes: node.internalNotes ?? null,
+				releaseMethod: node.releaseMethod,
+				planType: node.planType,
+				activeMemberCount: node.activeMemberCount,
+			})),
+			pageInfo: plansData.pageInfo,
+		}
 	}
 
 	/**
 	 * Create a plan for this product
 	 */
 	private async createPlan(
-		input: Omit<CreatePlanInput, 'productId'>,
+		input: Omit<CreatePlanInput, 'productId' | 'companyId'>,
 	): Promise<Plan> {
 		const tokens = this.client.getTokens()
 		if (!tokens) {
@@ -208,16 +234,28 @@ export class ProductBuilder {
 			)
 		}
 
+		// Updated to match Whop's actual GraphQL schema
+		// See: fe-monorepo/packages/gql/server-operations/company/create-plan.graphql
 		const mutation = `
       mutation createPlan($input: CreatePlanInput!) {
         createPlan(input: $input) {
-          plan {
+          id
+          directLink
+          releaseMethod
+          visibility
+          free
+          accessPass {
             id
-            planType
-            formattedPrice
-            directLink
-            visibility
+            route
           }
+          company {
+            id
+          }
+          initialPrice
+          renewalPrice
+          offerCancelDiscount
+          cancelDiscountPercentage
+          cancelDiscountIntervals
         }
       }
     `
@@ -225,6 +263,7 @@ export class ProductBuilder {
 		const variables = {
 			input: {
 				...input,
+				companyId: this.companyId,
 				productId: this.id,
 			},
 		}
@@ -236,7 +275,7 @@ export class ProductBuilder {
 			(newTokens) => this.client._updateTokens(newTokens),
 		)
 
-		return response.createPlan.plan
+		return response.createPlan // Returns Plan directly, not wrapped
 	}
 
 	/**
