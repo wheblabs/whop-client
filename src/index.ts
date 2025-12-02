@@ -16,12 +16,29 @@ export {
 	WhopValidationError,
 } from '@/lib/errors'
 export type {
+	ErrorInterceptor,
+	InterceptorConfig,
+	RequestContext,
+	RequestInterceptor,
+	RequestMetric,
+	ResponseContext,
+	ResponseInterceptor,
+} from '@/lib/interceptors'
+// Interceptor exports
+export {
+	createLoggingInterceptor,
+	createMetricsInterceptor,
+	createRetryInterceptor,
+	InterceptorManager,
+} from '@/lib/interceptors'
+
+// Pagination exports
+export type {
 	PageFetcher,
 	PageInfo as PaginationPageInfo,
 	PaginatedResponse,
 	PaginationOptions,
 } from '@/lib/pagination'
-// Pagination helpers
 export { createPaginator, fetchAll, paginate } from '@/lib/pagination'
 
 // Access resource exports
@@ -38,6 +55,7 @@ export type {
 // Affiliates resource exports
 export type {
 	Affiliate,
+	AffiliateCompanyMember,
 	AffiliatePlan,
 	AffiliateStatus,
 	AffiliatesConnection,

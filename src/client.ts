@@ -4,6 +4,14 @@ import {
 	WhopServerActionError,
 } from '@/lib/errors'
 import { graphqlRequest } from '@/lib/graphql'
+import {
+	type ErrorInterceptor,
+	InterceptorManager,
+	type RequestContext,
+	type RequestInterceptor,
+	type ResponseContext,
+	type ResponseInterceptor,
+} from '@/lib/interceptors'
 import { serverActionRequest } from '@/lib/rsc'
 import {
 	extractAllServerActions,
@@ -140,6 +148,7 @@ export class Whop {
 	private readonly onTokenRefresh?: (
 		newTokens: AuthTokens,
 	) => void | Promise<void>
+	private readonly interceptors: InterceptorManager
 
 	/**
 	 * Create a new Whop client instance
@@ -191,6 +200,11 @@ export class Whop {
 
 		this.sessionPath = options.sessionPath
 		this.onTokenRefresh = options.onTokenRefresh
+		this.interceptors = new InterceptorManager({
+			onRequest: options.onRequest,
+			onResponse: options.onResponse,
+			onError: options.onError,
+		})
 		this.access = new Access(this)
 		this.affiliates = new Affiliates(this)
 		this.analytics = new Analytics(this)
@@ -453,6 +467,88 @@ export class Whop {
 	}
 
 	/**
+	 * Add a request interceptor
+	 *
+	 * @param interceptor - Function to call before each request
+	 * @returns Function to remove the interceptor
+	 *
+	 * @example
+	 * ```typescript
+	 * const remove = whop.addRequestInterceptor(async (ctx) => {
+	 *   console.log(`Requesting ${ctx.operationName}`)
+	 *   return ctx
+	 * })
+	 *
+	 * // Later, remove the interceptor
+	 * remove()
+	 * ```
+	 */
+	addRequestInterceptor(interceptor: RequestInterceptor): () => void {
+		return this.interceptors.addRequestInterceptor(interceptor)
+	}
+
+	/**
+	 * Add a response interceptor
+	 *
+	 * @param interceptor - Function to call after each response
+	 * @returns Function to remove the interceptor
+	 *
+	 * @example
+	 * ```typescript
+	 * const remove = whop.addResponseInterceptor(async (ctx) => {
+	 *   console.log(`Response from ${ctx.request.operationName} in ${ctx.duration}ms`)
+	 *   return ctx
+	 * })
+	 *
+	 * // Later, remove the interceptor
+	 * remove()
+	 * ```
+	 */
+	addResponseInterceptor(interceptor: ResponseInterceptor): () => void {
+		return this.interceptors.addResponseInterceptor(interceptor)
+	}
+
+	/**
+	 * Add an error interceptor
+	 *
+	 * @param interceptor - Function to call when a request fails
+	 * @returns Function to remove the interceptor
+	 *
+	 * @example
+	 * ```typescript
+	 * const remove = whop.addErrorInterceptor(async (error, ctx) => {
+	 *   console.error(`Error in ${ctx.operationName}:`, error)
+	 *   return error
+	 * })
+	 *
+	 * // Later, remove the interceptor
+	 * remove()
+	 * ```
+	 */
+	addErrorInterceptor(interceptor: ErrorInterceptor): () => void {
+		return this.interceptors.addErrorInterceptor(interceptor)
+	}
+
+	/**
+	 * Clear all interceptors
+	 *
+	 * @example
+	 * ```typescript
+	 * whop.clearInterceptors()
+	 * ```
+	 */
+	clearInterceptors(): void {
+		this.interceptors.clear()
+	}
+
+	/**
+	 * Get the interceptor manager for advanced use cases
+	 */
+	getInterceptorManager(): InterceptorManager {
+		return this.interceptors
+	}
+
+	/**
 	 * Execute an arbitrary GraphQL query against Whop's API
 	 *
 	 * @param options - GraphQL query options
@@ -501,7 +597,7 @@ export class Whop {
 	 * // result.company is now typed
 	 * ```
 	 */
-	async graphql<T = any>(options: {
+	async graphql<T = unknown>(options: {
 		query: string
 		variables?: Record<string, unknown>
 		operationName?: string
@@ -515,17 +611,64 @@ export class Whop {
 
 		// Use operation name from options or extract from query (for URL)
 		const operationName = options.operationName || 'graphql'
+		const url = `https://api.whop.com/public/graphql/${operationName}`
+		const startTime = Date.now()
 
-		return graphqlRequest<T>(
+		// Create request context
+		let requestContext: RequestContext = {
 			operationName,
-			{
+			url,
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+				Accept: 'application/json',
+			},
+			body: {
 				query: options.query,
 				variables: options.variables,
 				operationName: options.operationName,
 			},
-			this._tokens,
-			(newTokens) => this._updateTokens(newTokens),
-		)
+			tokens: this._tokens,
+			startTime,
+		}
+
+		try {
+			// Run request interceptors
+			requestContext =
+				await this.interceptors.runRequestInterceptors(requestContext)
+
+			// Execute the actual request
+			const result = await graphqlRequest<T>(
+				operationName,
+				{
+					query: options.query,
+					variables: options.variables,
+					operationName: options.operationName,
+				},
+				this._tokens,
+				(newTokens) => this._updateTokens(newTokens),
+			)
+
+			// Run response interceptors
+			const responseContext: ResponseContext<T> = {
+				request: requestContext,
+				status: 200,
+				headers: new Headers(),
+				data: result,
+				duration: Date.now() - startTime,
+			}
+
+			const finalResponse =
+				await this.interceptors.runResponseInterceptors(responseContext)
+			return finalResponse.data
+		} catch (error) {
+			// Run error interceptors
+			const finalError = await this.interceptors.runErrorInterceptors(
+				error instanceof Error ? error : new Error(String(error)),
+				requestContext,
+			)
+			throw finalError
+		}
 	}
 
 	/**
