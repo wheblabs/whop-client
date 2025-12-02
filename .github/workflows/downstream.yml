@@ -1,4 +1,4 @@
-name: Downstream Tests
+name: Update Downstream Dependencies
 
 on:
   # Run after a successful release
@@ -10,24 +10,26 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to test (e.g., 0.6.0)'
+        description: 'Version to update to (e.g., 0.7.0)'
         required: false
         type: string
 
 jobs:
-  notify-downstream:
-    name: Trigger Downstream Tests
+  update-downstream:
+    name: Update ${{ matrix.repo }}
     runs-on: ubuntu-latest
-    # Only run if the release was successful
     if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
     
     strategy:
       fail-fast: false
       matrix:
-        repo:
-          - wheblabs/cli
-          - wheblabs/create-whop-app
-          - wheblabs/whopship
+        include:
+          - repo: wheblabs/whopctl
+            package_path: package.json
+          - repo: wheblabs/create-whop-app
+            package_path: package.json
+          - repo: wheblabs/whopship
+            package_path: package.json
     
     steps:
       - name: Get latest version
@@ -39,23 +41,83 @@ jobs:
             VERSION=$(npm view @whoplabs/whop-client version)
             echo "version=$VERSION" >> $GITHUB_OUTPUT
           fi
+          echo "Using version: $VERSION"
 
-      - name: Trigger downstream test
-        uses: peter-evans/repository-dispatch@v3
+      - name: Checkout downstream repo
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ matrix.repo }}
+          token: ${{ secrets.DOWNSTREAM_TOKEN }}
+          fetch-depth: 0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Update @whoplabs/whop-client version
+        run: |
+          # Update package.json with new version
+          VERSION="${{ steps.version.outputs.version }}"
+          
+          # Use jq to update the version (handles both dependencies and devDependencies)
+          if command -v jq &> /dev/null; then
+            if jq -e '.dependencies["@whoplabs/whop-client"]' ${{ matrix.package_path }} > /dev/null 2>&1; then
+              jq --arg v "^$VERSION" '.dependencies["@whoplabs/whop-client"] = $v' ${{ matrix.package_path }} > tmp.json && mv tmp.json ${{ matrix.package_path }}
+            fi
+            if jq -e '.devDependencies["@whoplabs/whop-client"]' ${{ matrix.package_path }} > /dev/null 2>&1; then
+              jq --arg v "^$VERSION" '.devDependencies["@whoplabs/whop-client"] = $v' ${{ matrix.package_path }} > tmp.json && mv tmp.json ${{ matrix.package_path }}
+            fi
+          else
+            # Fallback to sed
+            sed -i 's/"@whoplabs\/whop-client": "[^"]*"/"@whoplabs\/whop-client": "^'"$VERSION"'"/' ${{ matrix.package_path }}
+          fi
+          
+          # Show the change
+          echo "Updated package.json:"
+          grep -A1 -B1 "whop-client" ${{ matrix.package_path }} || true
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v6
+        id: cpr
         with:
           token: ${{ secrets.DOWNSTREAM_TOKEN }}
-          repository: ${{ matrix.repo }}
-          event-type: upstream-release
-          client-payload: |
-            {
-              "package": "@whoplabs/whop-client",
-              "version": "${{ steps.version.outputs.version }}",
-              "ref": "${{ github.sha }}"
-            }
+          commit-message: "chore(deps): update @whoplabs/whop-client to v${{ steps.version.outputs.version }}"
+          branch: deps/whop-client-${{ steps.version.outputs.version }}
+          delete-branch: true
+          title: "chore(deps): update @whoplabs/whop-client to v${{ steps.version.outputs.version }}"
+          body: |
+            ## Automated Dependency Update
+            
+            Updates `@whoplabs/whop-client` from the current version to **v${{ steps.version.outputs.version }}**.
+            
+            ### Changes
+            - Updated `package.json`
+            - Updated `bun.lock`
+            
+            ### Release Notes
+            See the [whop-client releases](https://github.com/wheblabs/whop-client/releases) for details.
+            
+            ---
+            *This PR was automatically created by the whop-client release workflow.*
+          labels: |
+            dependencies
+            automated
 
-      - name: Log dispatch
+      - name: Enable auto-merge
+        if: steps.cpr.outputs.pull-request-number
         run: |
-          echo "Triggered upstream-release event on ${{ matrix.repo }}"
-          echo "Package: @whoplabs/whop-client"
-          echo "Version: ${{ steps.version.outputs.version }}"
+          gh pr merge --auto --squash "${{ steps.cpr.outputs.pull-request-number }}"
+        env:
+          GH_TOKEN: ${{ secrets.DOWNSTREAM_TOKEN }}
 
+      - name: Summary
+        run: |
+          echo "### Dependency Update Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Repository:** ${{ matrix.repo }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version:** v${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **PR:** ${{ steps.cpr.outputs.pull-request-url }}" >> $GITHUB_STEP_SUMMARY
