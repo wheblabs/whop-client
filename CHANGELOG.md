@@ -1,3 +1,9 @@
+## [1.2.0](https://github.com/wheblabs/whop-client/compare/v1.1.0...v1.2.0) (2025-12-02)
+
+### Features
+
+* add request/response interceptors for lifecycle hooks ([a679e7b](https://github.com/wheblabs/whop-client/commit/a679e7bd1e0d0f5453e4e68b2e187a787386241d))
+
 ## [1.1.0](https://github.com/wheblabs/whop-client/compare/v1.0.0...v1.1.0) (2025-12-02)
 
 ### Features
