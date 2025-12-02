@@ -11,13 +11,19 @@ import {
 	extractServerActions,
 } from '@/lib/server-actions'
 import { loadSessionSync, saveSession } from '@/lib/session'
+import { Access } from '@/resources/access'
 import { AppStore } from '@/resources/app-store'
 import { Apps } from '@/resources/apps'
 import { Auth } from '@/resources/auth'
 import { Companies } from '@/resources/companies'
 import { CompanyBuilder } from '@/resources/company'
+import { Invoices } from '@/resources/invoices'
 import { Me } from '@/resources/me'
+import { Members } from '@/resources/members'
+import { Memberships } from '@/resources/memberships'
 import { Payments } from '@/resources/payments'
+import { Transfers } from '@/resources/transfers'
+import { Users } from '@/resources/users'
 import type { AuthTokens, ServerAction, WhopOptions } from '@/types'
 
 /**
@@ -95,12 +101,18 @@ import type { AuthTokens, ServerAction, WhopOptions } from '@/types'
  * @public
  */
 export class Whop {
+	public readonly access: Access
 	public readonly appStore: AppStore
 	public readonly auth: Auth
 	public readonly apps: Apps
 	public readonly companies: Companies
+	public readonly invoices: Invoices
 	public readonly me: Me
+	public readonly members: Members
+	public readonly memberships: Memberships
 	public readonly payments: Payments
+	public readonly transfers: Transfers
+	public readonly users: Users
 
 	private _tokens: AuthTokens | undefined = undefined
 	private _serverActions: ServerAction[] | undefined = undefined
@@ -159,12 +171,18 @@ export class Whop {
 
 		this.sessionPath = options.sessionPath
 		this.onTokenRefresh = options.onTokenRefresh
+		this.access = new Access(this)
 		this.appStore = new AppStore(this)
 		this.auth = new Auth(this)
 		this.apps = new Apps(this)
 		this.companies = new Companies(this)
+		this.invoices = new Invoices(this)
 		this.me = new Me(this)
+		this.members = new Members(this)
+		this.memberships = new Memberships(this)
 		this.payments = new Payments(this)
+		this.transfers = new Transfers(this)
+		this.users = new Users(this)
 
 		if (options.autoLoad) {
 			// Load session synchronously from file

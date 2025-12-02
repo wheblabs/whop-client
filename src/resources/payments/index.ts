@@ -1,4 +1,6 @@
 import type { Whop } from '@/client'
+import { WhopAuthError } from '@/lib/errors'
+import { graphqlRequest } from '@/lib/graphql'
 
 /**
  * Response type for createCheckoutSession
@@ -18,6 +20,133 @@ export interface CreateCheckoutSessionOptions {
 	apiKey?: string
 	companyId?: string
 	onBehalfOfUserId?: string
+}
+
+/**
+ * Payment status type
+ */
+export type PaymentStatus =
+	| 'paid'
+	| 'pending'
+	| 'failed'
+	| 'refunded'
+	| 'voided'
+	| 'disputed'
+
+/**
+ * Payment/Receipt details
+ */
+export interface Payment {
+	id: string
+	createdAt: string
+	status: PaymentStatus
+	amount: number
+	formattedAmount: string
+	paymentMethod?: string
+	currency?: string
+	refundedAt?: string
+	voidedAt?: string
+	disputedAt?: string
+	user?: {
+		id: string
+		email?: string
+		username?: string
+		name?: string
+	}
+	membership?: {
+		id: string
+		status: string
+	}
+	plan?: {
+		id: string
+		title?: string
+		planType?: string
+	}
+	accessPass?: {
+		id: string
+		title: string
+	}
+	company?: {
+		id: string
+		title: string
+	}
+	shipment?: {
+		id: string
+		status: string
+		trackingUrl?: string
+	}
+}
+
+/**
+ * Options for listing payments
+ */
+export interface ListPaymentsOptions {
+	/** Number of items per page */
+	first?: number
+	/** Pagination cursor */
+	after?: string
+	/** Filter by status */
+	status?: PaymentStatus | PaymentStatus[]
+	/** Search query */
+	query?: string
+	/** Filter by plan ID */
+	planId?: string
+	/** Filter by access pass ID */
+	accessPassId?: string
+	/** Only show refunded payments */
+	refunded?: boolean
+}
+
+/**
+ * Paginated payment list response
+ */
+export interface PaymentListResponse {
+	payments: Payment[]
+	totalCount: number
+	pageInfo: {
+		endCursor?: string
+		hasNextPage: boolean
+	}
+}
+
+/**
+ * Receipt (alias for payment in user context)
+ */
+export interface Receipt {
+	id: string
+	createdAt: string
+	status: string
+	amount: number
+	formattedAmount: string
+	plan?: {
+		id: string
+		title?: string
+	}
+	accessPass?: {
+		id: string
+		title: string
+	}
+	company?: {
+		id: string
+		title: string
+	}
+}
+
+/**
+ * Refund result
+ */
+export interface RefundResult {
+	id: string
+	refundedAt: string
+	status: PaymentStatus
+}
+
+/**
+ * Retry result
+ */
+export interface RetryResult {
+	id: string
+	status: PaymentStatus
 }
 
 /**
@@ -197,8 +326,6 @@ export class Payments {
 			)
 		}
 
-		const { graphqlRequest } = await import('@/lib/graphql')
-
 		const mutation = `
 			mutation createCheckoutSession($input: CreateCheckoutSessionInput!) {
 				createCheckoutSession(input: $input) {
@@ -229,5 +356,601 @@ export class Payments {
 		)
 
 		return response.createCheckoutSession
+	}
+
+	/**
+	 * List payments/receipts for a company
+	 *
+	 * @param companyId - Company ID
+	 * @param options - List options
+	 * @returns Paginated list of payments
+	 *
+	 * @example
+	 * ```typescript
+	 * const { payments } = await whop.payments.list('biz_xxx')
+	 *
+	 * // With filters
+	 * const { payments } = await whop.payments.list('biz_xxx', {
+	 *   status: 'paid',
+	 *   first: 50
+	 * })
+	 * ```
+	 */
+	async list(
+		companyId: string,
+		options?: ListPaymentsOptions,
+	): Promise<PaymentListResponse> {
+		const tokens = this.client.getTokens()
+		if (!tokens) {
+			throw new WhopAuthError(
+				'Not authenticated. Call auth.verify() first.',
+				'NOT_AUTHENTICATED',
+			)
+		}
+
+		const query = `
+			query fetchCompanyPayments($id: ID!, $filters: JSON!, $first: Int, $after: String) {
+				company(id: $id) {
+					creatorDashboardTable(tableFilters: $filters) {
+						receipts(first: $first, after: $after) {
+							nodes {
+								id
+								createdAt
+								formattedPrice
+								chargebackAt
+								refundedAt
+								paymentMethod
+								mostRecentAction {
+									name
+									timestamp
+								}
+								member {
+									id
+									email
+									name
+									username
+								}
+								plan {
+									id
+									title
+									planType
+								}
+								accessPass {
+									id
+									title
+								}
+								shipment {
+									id
+									status
+									labelTrackingUrl
+								}
+							}
+							totalCount
+							pageInfo {
+								endCursor
+								hasNextPage
+							}
+						}
+					}
+				}
+			}
+		`
+
+		// Build filters object
+		const filters: Record<string, unknown> = {}
+		if (options?.status) {
+			filters.status = Array.isArray(options.status)
+				? options.status
+				: [options.status]
+		}
+		if (options?.query) {
+			filters.query = options.query
+		}
+		if (options?.planId) {
+			filters.planId = options.planId
+		}
+		if (options?.accessPassId) {
+			filters.accessPassId = options.accessPassId
+		}
+		if (options?.refunded !== undefined) {
+			filters.refunded = options.refunded
+		}
+
+		const variables = {
+			id: companyId,
+			filters,
+			first: options?.first ?? 25,
+			after: options?.after,
+		}
+
+		const response = await graphqlRequest<{
+			company: {
+				creatorDashboardTable: {
+					receipts: {
+						nodes: Array<{
+							id: string
+							createdAt: string
+							formattedPrice: string
+							chargebackAt?: string
+							refundedAt?: string
+							paymentMethod?: string
+							mostRecentAction?: {
+								name: string
+								timestamp: string
+							}
+							member?: {
+								id: string
+								email?: string
+								name?: string
+								username?: string
+							}
+							plan?: {
+								id: string
+								title?: string
+								planType?: string
+							}
+							accessPass?: {
+								id: string
+								title: string
+							}
+							shipment?: {
+								id: string
+								status: string
+								labelTrackingUrl?: string
+							}
+						}>
+						totalCount: number
+						pageInfo: {
+							endCursor?: string
+							hasNextPage: boolean
+						}
+					}
+				}
+			}
+		}>(
+			'fetchCompanyPayments',
+			{ query, variables, operationName: 'fetchCompanyPayments' },
+			tokens,
+			(newTokens) => this.client._updateTokens(newTokens),
+		)
+
+		const { nodes, totalCount, pageInfo } =
+			response.company.creatorDashboardTable.receipts
+
+		// Transform nodes to Payment type
+		const payments: Payment[] = nodes.map((node) => ({
+			id: node.id,
+			createdAt: node.createdAt,
+			status: node.refundedAt
+				? 'refunded'
+				: node.chargebackAt
+					? 'disputed'
+					: ('paid' as PaymentStatus),
+			amount: 0, // Amount would need parsing from formattedPrice
+			formattedAmount: node.formattedPrice,
+			paymentMethod: node.paymentMethod,
+			refundedAt: node.refundedAt,
+			disputedAt: node.chargebackAt,
+			user: node.member
+				? {
+						id: node.member.id,
+						email: node.member.email,
+						username: node.member.username,
+						name: node.member.name,
+					}
+				: undefined,
+			plan: node.plan,
+			accessPass: node.accessPass,
+			shipment: node.shipment
+				? {
+						id: node.shipment.id,
+						status: node.shipment.status,
+						trackingUrl: node.shipment.labelTrackingUrl,
+					}
+				: undefined,
+		}))
+
+		return {
+			payments,
+			totalCount,
+			pageInfo,
+		}
+	}
+
+	/**
+	 * Get a specific payment/receipt by ID
+	 *
+	 * @param receiptId - Receipt ID
+	 * @returns Payment details
+	 */
+	async get(receiptId: string): Promise<Payment> {
+		const tokens = this.client.getTokens()
+		if (!tokens) {
+			throw new WhopAuthError(
+				'Not authenticated. Call auth.verify() first.',
+				'NOT_AUTHENTICATED',
+			)
+		}
+
+		const query = `
+			query fetchReceipt($id: ID!) {
+				receipt(id: $id) {
+					id
+					createdAt
+					formattedPrice
+					chargebackAt
+					refundedAt
+					voidedAt
+					paymentMethod
+					currency
+					member {
+						id
+						email
+						name
+						username
+					}
+					membership {
+						id
+						status
+					}
+					plan {
+						id
+						title
+						planType
+					}
+					accessPass {
+						id
+						title
+					}
+					company {
+						id
+						title
+					}
+					shipment {
+						id
+						status
+						labelTrackingUrl
+					}
+				}
+			}
+		`
+
+		const variables = { id: receiptId }
+
+		const response = await graphqlRequest<{
+			receipt: {
+				id: string
+				createdAt: string
+				formattedPrice: string
+				chargebackAt?: string
+				refundedAt?: string
+				voidedAt?: string
+				paymentMethod?: string
+				currency?: string
+				member?: {
+					id: string
+					email?: string
+					name?: string
+					username?: string
+				}
+				membership?: {
+					id: string
+					status: string
+				}
+				plan?: {
+					id: string
+					title?: string
+					planType?: string
+				}
+				accessPass?: {
+					id: string
+					title: string
+				}
+				company?: {
+					id: string
+					title: string
+				}
+				shipment?: {
+					id: string
+					status: string
+					labelTrackingUrl?: string
+				}
+			}
+		}>(
+			'fetchReceipt',
+			{ query, variables, operationName: 'fetchReceipt' },
+			tokens,
+			(newTokens) => this.client._updateTokens(newTokens),
+		)
+
+		const r = response.receipt
+		let status: PaymentStatus = 'paid'
+		if (r.voidedAt) status = 'voided'
+		else if (r.refundedAt) status = 'refunded'
+		else if (r.chargebackAt) status = 'disputed'
+
+		return {
+			id: r.id,
+			createdAt: r.createdAt,
+			status,
+			amount: 0,
+			formattedAmount: r.formattedPrice,
+			paymentMethod: r.paymentMethod,
+			currency: r.currency,
+			refundedAt: r.refundedAt,
+			voidedAt: r.voidedAt,
+			disputedAt: r.chargebackAt,
+			user: r.member
+				? {
+						id: r.member.id,
+						email: r.member.email,
+						username: r.member.username,
+						name: r.member.name,
+					}
+				: undefined,
+			membership: r.membership,
+			plan: r.plan,
+			accessPass: r.accessPass,
+			company: r.company,
+			shipment: r.shipment
+				? {
+						id: r.shipment.id,
+						status: r.shipment.status,
+						trackingUrl: r.shipment.labelTrackingUrl,
+					}
+				: undefined,
+		}
+	}
+
+	/**
+	 * Refund a payment
+	 *
+	 * @param receiptId - Receipt ID to refund
+	 * @param amount - Optional partial refund amount (cents). If not provided, full refund.
+	 * @returns Refund result
+	 */
+	async refund(receiptId: string, amount?: number): Promise<RefundResult> {
+		const tokens = this.client.getTokens()
+		if (!tokens) {
+			throw new WhopAuthError(
+				'Not authenticated. Call auth.verify() first.',
+				'NOT_AUTHENTICATED',
+			)
+		}
+
+		const mutation = `
+			mutation refundReceipt($input: RefundReceiptInput!) {
+				refundReceipt(input: $input) {
+					id
+					refundedAt
+				}
+			}
+		`
+
+		const variables = {
+			input: {
+				receiptId,
+				...(amount !== undefined && { amount }),
+			},
+		}
+
+		const response = await graphqlRequest<{
+			refundReceipt: {
+				id: string
+				refundedAt: string
+			}
+		}>(
+			'refundReceipt',
+			{ query: mutation, variables, operationName: 'refundReceipt' },
+			tokens,
+			(newTokens) => this.client._updateTokens(newTokens),
+		)
+
+		return {
+			id: response.refundReceipt.id,
+			refundedAt: response.refundReceipt.refundedAt,
+			status: 'refunded',
+		}
+	}
+
+	/**
+	 * Retry a failed payment
+	 *
+	 * @param receiptId - Receipt ID to retry
+	 * @returns Retry result
+	 */
+	async retry(receiptId: string): Promise<RetryResult> {
+		const tokens = this.client.getTokens()
+		if (!tokens) {
+			throw new WhopAuthError(
+				'Not authenticated. Call auth.verify() first.',
+				'NOT_AUTHENTICATED',
+			)
+		}
+
+		const mutation = `
+			mutation retryPayment($input: RetryPaymentInput!) {
+				retryPayment(input: $input) {
+					id
+					status
+				}
+			}
+		`
+
+		const variables = {
+			input: {
+				receiptId,
+			},
+		}
+
+		const response = await graphqlRequest<{
+			retryPayment: {
+				id: string
+				status: PaymentStatus
+			}
+		}>(
+			'retryPayment',
+			{ query: mutation, variables, operationName: 'retryPayment' },
+			tokens,
+			(newTokens) => this.client._updateTokens(newTokens),
+		)
+
+		return response.retryPayment
+	}
+
+	/**
+	 * Void a payment (cancel before processing)
+	 *
+	 * @param receiptId - Receipt ID to void
+	 * @returns Updated payment with voided status
+	 */
+	async void(receiptId: string): Promise<Payment> {
+		const tokens = this.client.getTokens()
+		if (!tokens) {
+			throw new WhopAuthError(
+				'Not authenticated. Call auth.verify() first.',
+				'NOT_AUTHENTICATED',
+			)
+		}
+
+		const mutation = `
+			mutation voidReceipt($input: VoidReceiptInput!) {
+				voidReceipt(input: $input) {
+					id
+					voidedAt
+				}
+			}
+		`
+
+		const variables = {
+			input: {
+				receiptId,
+			},
+		}
+
+		const response = await graphqlRequest<{
+			voidReceipt: {
+				id: string
+				voidedAt: string
+			}
+		}>(
+			'voidReceipt',
+			{ query: mutation, variables, operationName: 'voidReceipt' },
+			tokens,
+			(newTokens) => this.client._updateTokens(newTokens),
+		)
+
+		return {
+			id: response.voidReceipt.id,
+			createdAt: '',
+			status: 'voided',
+			amount: 0,
+			formattedAmount: '',
+			voidedAt: response.voidReceipt.voidedAt,
+		}
+	}
+
+	/**
+	 * List receipts for the current user
+	 *
+	 * @param options - List options
+	 * @returns User's receipts
+	 */
+	async listReceipts(options?: {
+		first?: number
+		after?: string
+		companyId?: string
+		excludeFree?: boolean
+	}): Promise<{ receipts: Receipt[]; totalCount: number }> {
+		const tokens = this.client.getTokens()
+		if (!tokens) {
+			throw new WhopAuthError(
+				'Not authenticated. Call auth.verify() first.',
+				'NOT_AUTHENTICATED',
+			)
+		}
+
+		const query = `
+			query fetchMyReceipts($companyId: ID, $first: Int, $after: String, $excludeFree: Boolean) {
+				viewer {
+					user {
+						receipts(companyId: $companyId, first: $first, after: $after, excludeFree: $excludeFree) {
+							nodes {
+								id
+								createdAt
+								formattedPrice
+								plan {
+									id
+									title
+								}
+								accessPass {
+									id
+									title
+								}
+								company {
+									id
+									title
+								}
+							}
+							totalCount
+						}
+					}
+				}
+			}
+		`
+
+		const variables = {
+			first: options?.first ?? 25,
+			after: options?.after,
+			companyId: options?.companyId,
+			excludeFree: options?.excludeFree ?? true,
+		}
+
+		const response = await graphqlRequest<{
+			viewer: {
+				user: {
+					receipts: {
+						nodes: Array<{
+							id: string
+							createdAt: string
+							formattedPrice: string
+							plan?: {
+								id: string
+								title?: string
+							}
+							accessPass?: {
+								id: string
+								title: string
+							}
+							company?: {
+								id: string
+								title: string
+							}
+						}>
+						totalCount: number
+					}
+				}
+			}
+		}>(
+			'fetchMyReceipts',
+			{ query, variables, operationName: 'fetchMyReceipts' },
+			tokens,
+			(newTokens) => this.client._updateTokens(newTokens),
+		)
+
+		const { nodes, totalCount } = response.viewer.user.receipts
+
+		const receipts: Receipt[] = nodes.map((node) => ({
+			id: node.id,
+			createdAt: node.createdAt,
+			status: 'paid',
+			amount: 0,
+			formattedAmount: node.formattedPrice,
+			plan: node.plan,
+			accessPass: node.accessPass,
+			company: node.company,
+		}))
+
+		return { receipts, totalCount }
 	}
 }

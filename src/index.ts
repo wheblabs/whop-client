@@ -9,10 +9,94 @@ export {
 	WhopServerActionError,
 	WhopServerActionNotFoundError,
 } from '@/lib/errors'
+
+// Access resource exports
+export type {
+	AccessCheckResult,
+	AccessPassAccess,
+	BulkAccessCheckResult,
+	CheckAccessPassAccessOptions,
+	CheckExperienceAccessOptions,
+	ExperienceAccess,
+	UserAccessSummary,
+} from '@/resources/access'
+
+// Invoices resource exports
+export type {
+	CreateInvoiceInput,
+	Invoice,
+	InvoiceLineItem,
+	InvoiceListResponse,
+	InvoiceRecipient,
+	InvoiceStatus,
+	ListInvoicesOptions,
+	VoidInvoiceResult,
+} from '@/resources/invoices'
+
+// Members resource exports
+export type {
+	BanResult,
+	DiscordAccount,
+	ImageSrcset,
+	ListMembersOptions,
+	Member,
+	MemberListResponse,
+	MemberUser,
+	TelegramAccount,
+	TwitterAccount,
+	UnbanResult,
+} from '@/resources/members'
+
+// Memberships resource exports
+export type {
+	AccessPass,
+	CancelMembershipOptions,
+	CompanyMember,
+	ListMembershipsOptions,
+	Membership,
+	MembershipAction,
+	MembershipCompany,
+	MembershipListResponse,
+	MembershipPlan,
+	MembershipStatus,
+	PauseMembershipOptions,
+	PauseResumeResult,
+	PlanType,
+	ResumeMembershipOptions,
+	TransferMembershipOptions,
+} from '@/resources/memberships'
+
+// Payments resource exports
 export type {
 	CreateCheckoutSessionOptions,
 	CreateCheckoutSessionResponse,
+	ListPaymentsOptions,
+	Payment,
+	PaymentListResponse,
+	PaymentStatus,
+	Receipt,
+	RefundResult,
+	RetryResult,
 } from '@/resources/payments'
+
+// Transfers resource exports
+export type {
+	CreateTransferInput,
+	ListTransfersOptions,
+	Transfer,
+	TransferListResponse,
+	TransferMethod,
+	TransferStatus,
+} from '@/resources/transfers'
+
+// Users resource exports
+export type {
+	PublicUser,
+	User,
+	UserDiscordAccount,
+	UserTelegramAccount,
+	UserTwitterAccount,
+} from '@/resources/users'
 export type {
 	AgentUser,
 	ApiKey,

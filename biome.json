@@ -11,9 +11,28 @@
 	"linter": {
 		"enabled": true,
 		"rules": {
-			"recommended": true
+			"recommended": true,
+			"suspicious": {
+				"noExplicitAny": "warn",
+				"noTemplateCurlyInString": "off"
+			},
+			"style": {
+				"noNonNullAssertion": "warn"
+			}
 		}
 	},
+	"overrides": [
+		{
+			"includes": ["src/__tests__/**"],
+			"linter": {
+				"rules": {
+					"suspicious": {
+						"noExplicitAny": "off"
+					}
+				}
+			}
+		}
+	],
 	"formatter": {
 		"enabled": true,
 		"useEditorconfig": true
