@@ -1,3 +1,9 @@
+## [1.1.0](https://github.com/wheblabs/whop-client/compare/v1.0.0...v1.1.0) (2025-12-02)
+
+### Features
+
+* add comprehensive SDK resources for first-class developer experience ([522ddda](https://github.com/wheblabs/whop-client/commit/522ddda840ba9428e323d9e93124ae0c7ac3584f))
+
 ## 1.0.0 (2025-12-02)
 
 ### Features
