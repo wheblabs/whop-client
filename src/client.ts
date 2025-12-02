@@ -12,18 +12,28 @@ import {
 } from '@/lib/server-actions'
 import { loadSessionSync, saveSession } from '@/lib/session'
 import { Access } from '@/resources/access'
+import { Affiliates } from '@/resources/affiliates'
+import { Analytics } from '@/resources/analytics'
 import { AppStore } from '@/resources/app-store'
 import { Apps } from '@/resources/apps'
+import { AuditLogs } from '@/resources/audit-logs'
 import { Auth } from '@/resources/auth'
 import { Companies } from '@/resources/companies'
 import { CompanyBuilder } from '@/resources/company'
+import { Courses } from '@/resources/courses'
+import { Disputes } from '@/resources/disputes'
 import { Invoices } from '@/resources/invoices'
+import { Livestreaming } from '@/resources/livestreaming'
 import { Me } from '@/resources/me'
 import { Members } from '@/resources/members'
 import { Memberships } from '@/resources/memberships'
 import { Payments } from '@/resources/payments'
+import { Payouts } from '@/resources/payouts'
+import { PromoCodes } from '@/resources/promo-codes'
+import { Team } from '@/resources/team'
 import { Transfers } from '@/resources/transfers'
 import { Users } from '@/resources/users'
+import { Webhooks } from '@/resources/webhooks'
 import type { AuthTokens, ServerAction, WhopOptions } from '@/types'
 
 /**
@@ -102,17 +112,27 @@ import type { AuthTokens, ServerAction, WhopOptions } from '@/types'
  */
 export class Whop {
 	public readonly access: Access
+	public readonly affiliates: Affiliates
+	public readonly analytics: Analytics
 	public readonly appStore: AppStore
-	public readonly auth: Auth
 	public readonly apps: Apps
+	public readonly auditLogs: AuditLogs
+	public readonly auth: Auth
 	public readonly companies: Companies
+	public readonly courses: Courses
+	public readonly disputes: Disputes
 	public readonly invoices: Invoices
+	public readonly livestreaming: Livestreaming
 	public readonly me: Me
 	public readonly members: Members
 	public readonly memberships: Memberships
 	public readonly payments: Payments
+	public readonly payouts: Payouts
+	public readonly promoCodes: PromoCodes
+	public readonly team: Team
 	public readonly transfers: Transfers
 	public readonly users: Users
+	public readonly webhooks: Webhooks
 
 	private _tokens: AuthTokens | undefined = undefined
 	private _serverActions: ServerAction[] | undefined = undefined
@@ -172,17 +192,27 @@ export class Whop {
 		this.sessionPath = options.sessionPath
 		this.onTokenRefresh = options.onTokenRefresh
 		this.access = new Access(this)
+		this.affiliates = new Affiliates(this)
+		this.analytics = new Analytics(this)
 		this.appStore = new AppStore(this)
-		this.auth = new Auth(this)
 		this.apps = new Apps(this)
+		this.auditLogs = new AuditLogs(this)
+		this.auth = new Auth(this)
 		this.companies = new Companies(this)
+		this.courses = new Courses(this)
+		this.disputes = new Disputes(this)
 		this.invoices = new Invoices(this)
+		this.livestreaming = new Livestreaming(this)
 		this.me = new Me(this)
 		this.members = new Members(this)
 		this.memberships = new Memberships(this)
 		this.payments = new Payments(this)
+		this.payouts = new Payouts(this)
+		this.promoCodes = new PromoCodes(this)
+		this.team = new Team(this)
 		this.transfers = new Transfers(this)
 		this.users = new Users(this)
+		this.webhooks = new Webhooks(this)
 
 		if (options.autoLoad) {
 			// Load session synchronously from file
