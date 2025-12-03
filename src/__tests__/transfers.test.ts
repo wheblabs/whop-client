@@ -2,12 +2,10 @@ import { beforeEach, describe, expect, it, mock } from 'bun:test'
 import { Whop } from '../client'
 
 // Mock fetch globally - using any to simplify test setup
-// biome-ignore lint/suspicious/noExplicitAny: Test mocking
 const mockFetch = mock(
 	(): Promise<any> =>
 		Promise.resolve({ ok: true, json: () => ({ data: {} }), text: () => '' }),
 )
-// biome-ignore lint/suspicious/noExplicitAny: Test mocking
 globalThis.fetch = mockFetch as any
 
 describe('Transfers', () => {

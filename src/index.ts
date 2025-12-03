@@ -1,4 +1,5 @@
 export { Whop } from '@/client'
+export { hasTokens, requireAuth } from '@/lib/auth-guard'
 export {
 	WhopAPIError,
 	WhopAuthError,
@@ -23,6 +24,7 @@ export type {
 	RequestMetric,
 	ResponseContext,
 	ResponseInterceptor,
+	RetryOptions,
 } from '@/lib/interceptors'
 // Interceptor exports
 export {
@@ -30,6 +32,8 @@ export {
 	createMetricsInterceptor,
 	createRetryInterceptor,
 	InterceptorManager,
+	isRetryableError,
+	withRetry,
 } from '@/lib/interceptors'
 
 // Pagination exports

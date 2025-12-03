@@ -104,8 +104,8 @@ async function main() {
 			console.log(`  - ${post.title}`)
 		}
 
-		if (pageResult.pagination.hasNextPage) {
-			before = pageResult.pagination.nextBefore!
+		if (pageResult.pagination.hasNextPage && pageResult.pagination.nextBefore) {
+			before = pageResult.pagination.nextBefore
 			page++
 		} else {
 			break
@@ -162,8 +162,11 @@ async function main() {
 				)
 			}
 
-			if (commentPageResult.pagination.hasNextPage) {
-				commentBefore = commentPageResult.pagination.nextBefore!
+			if (
+				commentPageResult.pagination.hasNextPage &&
+				commentPageResult.pagination.nextBefore
+			) {
+				commentBefore = commentPageResult.pagination.nextBefore
 				commentPage++
 			} else {
 				break

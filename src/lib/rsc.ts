@@ -1,21 +1,9 @@
 import type { AuthTokens } from '@/types/auth'
 import type { RSCResult } from '@/types/server-actions'
+import { buildCookieHeader } from './cookies-builder'
 
-/**
- * Build cookie header string from auth tokens
- */
-function buildCookieHeader(tokens: AuthTokens): string {
-	return [
-		`whop-core.access-token=${tokens.accessToken}`,
-		`__Host-whop-core.csrf-token=${tokens.csrfToken}`,
-		`whop-core.refresh-token=${tokens.refreshToken}`,
-		tokens.uidToken ? `whop-core.uid-token=${tokens.uidToken}` : '',
-		tokens.ssk ? `whop-core.ssk=${tokens.ssk}` : '',
-		tokens.userId ? `whop-core.user-id=${tokens.userId}` : '',
-	]
-		.filter(Boolean)
-		.join('; ')
-}
+/** Default request timeout in milliseconds (30 seconds) */
+const DEFAULT_TIMEOUT_MS = 30_000
 
 /**
  * Parse Next.js RSC (React Server Component) response
@@ -41,19 +29,43 @@ export function parseRSCResponse<T>(text: string): RSCResult<T> {
 }
 
 /**
+ * Options for server action requests
+ */
+export interface ServerActionRequestOptions {
+	/** Auth tokens for authenticated requests */
+	tokens?: AuthTokens
+	/** Request timeout in milliseconds (default: 30000) */
+	timeout?: number
+}
+
+/**
  * Make a Next.js server action request
  * @param url Target URL (e.g., https://whop.com/login)
  * @param actionId Server action ID from extraction
  * @param fieldsOrBody Form fields as key-value pairs, or raw body string/object
- * @param tokens Optional auth tokens for authenticated requests
+ * @param tokensOrOptions Optional auth tokens or options object (backwards compatible)
  * @returns Raw fetch Response
  */
 export async function serverActionRequest(
 	url: string,
 	actionId: string,
 	fieldsOrBody: Array<[string, string]> | string | object,
-	tokens?: AuthTokens,
+	tokensOrOptions?: AuthTokens | ServerActionRequestOptions,
 ): Promise<Response> {
+	// Backwards compatibility: accept either tokens directly or options object
+	let tokens: AuthTokens | undefined
+	let timeout = DEFAULT_TIMEOUT_MS
+
+	if (tokensOrOptions) {
+		// Check if it's a tokens object (has accessToken) or options object
+		if ('accessToken' in tokensOrOptions) {
+			tokens = tokensOrOptions
+		} else {
+			tokens = tokensOrOptions.tokens
+			timeout = tokensOrOptions.timeout ?? DEFAULT_TIMEOUT_MS
+		}
+	}
+
 	const headers: HeadersInit = {
 		'next-action': actionId,
 		'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)',
@@ -93,9 +105,18 @@ export async function serverActionRequest(
 		headers.Cookie = buildCookieHeader(tokens)
 	}
 
-	return fetch(url, {
-		method: 'POST',
-		headers,
-		body,
-	})
+	// Create AbortController for timeout
+	const controller = new AbortController()
+	const timeoutId = setTimeout(() => controller.abort(), timeout)
+
+	try {
+		return await fetch(url, {
+			method: 'POST',
+			headers,
+			body,
+			signal: controller.signal,
+		})
+	} finally {
+		clearTimeout(timeoutId)
+	}
 }

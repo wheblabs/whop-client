@@ -1,6 +1,10 @@
 import type { AuthTokens } from '../types/auth'
 import { extractAuthTokens } from './cookies'
+import { buildCookieHeader } from './cookies-builder'
 import { WhopHTTPError, WhopNetworkError } from './errors'
+
+/** Default request timeout in milliseconds (30 seconds) */
+const DEFAULT_TIMEOUT_MS = 30_000
 
 /**
  * GraphQL request options
@@ -9,6 +13,8 @@ export interface GraphQLRequestOptions {
 	query: string
 	variables?: Record<string, unknown>
 	operationName?: string
+	/** Request timeout in milliseconds (default: 30000) */
+	timeout?: number
 }
 
 /**
@@ -36,7 +42,7 @@ export type TokenUpdateCallback = (newTokens: AuthTokens) => void
  * @param tokens - Auth tokens for authentication
  * @param onTokenRefresh - Optional callback when tokens are refreshed
  * @returns Parsed GraphQL response
- * @throws {WhopNetworkError} On network failures
+ * @throws {WhopNetworkError} On network failures or timeout
  * @throws {WhopHTTPError} On HTTP errors
  */
 export async function graphqlRequest<T>(
@@ -46,20 +52,15 @@ export async function graphqlRequest<T>(
 	onTokenRefresh?: TokenUpdateCallback,
 ): Promise<T> {
 	const url = `https://whop.com/api/graphql/${operationName}/`
+	const timeout = options.timeout ?? DEFAULT_TIMEOUT_MS
+
+	// Create AbortController for timeout
+	const controller = new AbortController()
+	const timeoutId = setTimeout(() => controller.abort(), timeout)
 
 	let response: Response
 	try {
-		// Build cookie string from tokens (like browser does)
-		const cookieString = [
-			`whop-core.access-token=${tokens.accessToken}`,
-			`__Host-whop-core.csrf-token=${tokens.csrfToken}`,
-			`whop-core.refresh-token=${tokens.refreshToken}`,
-			tokens.uidToken ? `whop-core.uid-token=${tokens.uidToken}` : '',
-			tokens.ssk ? `whop-core.ssk=${tokens.ssk}` : '',
-			tokens.userId ? `whop-core.user-id=${tokens.userId}` : '',
-		]
-			.filter(Boolean)
-			.join('; ')
+		const cookieString = buildCookieHeader(tokens)
 
 		response = await fetch(url, {
 			method: 'POST',
@@ -76,14 +77,26 @@ export async function graphqlRequest<T>(
 				variables: options.variables || {},
 				operationName: options.operationName,
 			}),
+			signal: controller.signal,
 		})
 	} catch (error) {
+		// Check if it was a timeout
+		if (error instanceof Error && error.name === 'AbortError') {
+			throw new WhopNetworkError(
+				`Request to ${operationName} timed out after ${timeout}ms`,
+				url,
+				undefined,
+				error,
+			)
+		}
 		throw new WhopNetworkError(
 			`Network error during GraphQL request to ${operationName}`,
 			url,
 			undefined,
 			error as Error,
 		)
+	} finally {
+		clearTimeout(timeoutId)
 	}
 
 	// Check for refreshed tokens in Set-Cookie headers

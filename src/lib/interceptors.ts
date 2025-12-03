@@ -244,7 +244,154 @@ export function createLoggingInterceptor(options?: {
 }
 
 /**
- * Create a retry interceptor
+ * Options for retry functionality
+ */
+export interface RetryOptions {
+	/** Maximum number of retry attempts (default: 3) */
+	maxRetries?: number
+	/** Base delay in milliseconds between retries (default: 1000) */
+	baseDelayMs?: number
+	/** Maximum delay in milliseconds (default: 30000) */
+	maxDelayMs?: number
+	/** Whether to use exponential backoff (default: true) */
+	exponentialBackoff?: boolean
+	/** Custom function to determine if an error is retryable */
+	shouldRetry?: (error: Error) => boolean
+	/** Callback when a retry is attempted */
+	onRetry?: (attempt: number, error: Error, delayMs: number) => void
+}
+
+/**
+ * Default function to determine if an error is retryable
+ * Retries on network errors and 5xx server errors
+ */
+export function isRetryableError(error: Error): boolean {
+	// Network errors
+	if (error.name === 'AbortError') return false // Don't retry timeouts
+	if (error.message.includes('Network error')) return true
+	if (error.message.includes('fetch')) return true
+
+	// Check for HTTP status in error message
+	const statusMatch = error.message.match(/HTTP (\d{3})/)
+	if (statusMatch?.[1]) {
+		const status = parseInt(statusMatch[1], 10)
+		// Retry on 429 (rate limit) and 5xx (server errors)
+		return status === 429 || (status >= 500 && status < 600)
+	}
+
+	return false
+}
+
+/**
+ * Calculate delay with exponential backoff and jitter
+ */
+function calculateDelay(
+	attempt: number,
+	baseDelayMs: number,
+	maxDelayMs: number,
+	exponentialBackoff: boolean,
+): number {
+	if (!exponentialBackoff) {
+		return baseDelayMs
+	}
+
+	// Exponential backoff: baseDelay * 2^attempt
+	const exponentialDelay = baseDelayMs * 2 ** attempt
+
+	// Add jitter (±25%)
+	const jitter = exponentialDelay * 0.25 * (Math.random() * 2 - 1)
+
+	return Math.min(exponentialDelay + jitter, maxDelayMs)
+}
+
+/**
+ * Sleep for a given number of milliseconds
+ */
+function sleep(ms: number): Promise<void> {
+	return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+/**
+ * Wrap an async operation with retry logic
+ *
+ * @param operation - The async function to execute
+ * @param options - Retry configuration options
+ * @returns The result of the operation
+ * @throws The last error if all retries are exhausted
+ *
+ * @example
+ * ```typescript
+ * // Retry a GraphQL request up to 3 times
+ * const result = await withRetry(
+ *   () => whop.graphql({ query: '...' }),
+ *   { maxRetries: 3 }
+ * )
+ * ```
+ *
+ * @example
+ * ```typescript
+ * // Custom retry logic with callbacks
+ * const result = await withRetry(
+ *   () => fetchData(),
+ *   {
+ *     maxRetries: 5,
+ *     baseDelayMs: 500,
+ *     shouldRetry: (error) => error.message.includes('temporary'),
+ *     onRetry: (attempt, error, delay) => {
+ *       console.log(`Retry ${attempt} after ${delay}ms: ${error.message}`)
+ *     }
+ *   }
+ * )
+ * ```
+ */
+export async function withRetry<T>(
+	operation: () => Promise<T>,
+	options?: RetryOptions,
+): Promise<T> {
+	const {
+		maxRetries = 3,
+		baseDelayMs = 1000,
+		maxDelayMs = 30_000,
+		exponentialBackoff = true,
+		shouldRetry = isRetryableError,
+		onRetry,
+	} = options ?? {}
+
+	let lastError: Error | undefined
+
+	for (let attempt = 0; attempt <= maxRetries; attempt++) {
+		try {
+			return await operation()
+		} catch (error) {
+			lastError = error instanceof Error ? error : new Error(String(error))
+
+			// Check if we should retry
+			if (attempt < maxRetries && shouldRetry(lastError)) {
+				const delay = calculateDelay(
+					attempt,
+					baseDelayMs,
+					maxDelayMs,
+					exponentialBackoff,
+				)
+
+				if (onRetry) {
+					onRetry(attempt + 1, lastError, delay)
+				}
+
+				await sleep(delay)
+			} else {
+				throw lastError
+			}
+		}
+	}
+
+	// This should never be reached, but TypeScript needs it
+	throw lastError
+}
+
+/**
+ * Create a retry interceptor for tracking retry state
+ * @deprecated Use `withRetry()` function instead for actual retry logic
  */
 export function createRetryInterceptor(options?: {
 	maxRetries?: number
@@ -267,8 +414,6 @@ export function createRetryInterceptor(options?: {
 			console.log(
 				`[Whop SDK] Retry ${count + 1}/${maxRetries} for ${ctx.operationName}`,
 			)
-			// Note: actual retry logic would need to be handled in the fetch wrapper
-			// This interceptor just tracks retry state
 		} else {
 			retryCount.delete(key)
 		}
