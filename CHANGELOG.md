@@ -1,3 +1,9 @@
+## [1.3.0](https://github.com/wheblabs/whop-client/compare/v1.2.0...v1.3.0) (2025-12-03)
+
+### Features
+
+* add request timeouts, retry utilities, and auth helpers ([7d03c7e](https://github.com/wheblabs/whop-client/commit/7d03c7e93f3f2bf91308a905d32fdc3b8d5435dc))
+
 ## [1.2.0](https://github.com/wheblabs/whop-client/compare/v1.1.0...v1.2.0) (2025-12-02)
 
 ### Features
